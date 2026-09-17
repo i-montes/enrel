@@ -75,3 +75,51 @@ Suma de la tabla: 25363+14289+11078+5902+3258+1353+1344+1236+79+48+15+9+17 = 639
 | 2016-2021 | 20395 |
 | 2022-2026 | 35394 |
 | sin-fecha | 1 |
+
+## Selección de plata (semilla 2026)
+
+**Fecha:** 2026-09-17
+
+**Comando:**
+
+```bash
+uv run enrel muestrear --corpus datos/corpus/articulos.jsonl --excluir datos/conjuntos/protegidos.txt \
+  --salida datos/conjuntos/seleccion.jsonl --semilla 2026
+```
+
+(parámetros por defecto: `--cuota-relacion 120 --perfiles 400 --aleatorios 1100 --humo 30`; excluidos los 50
+`doc_id` de `datos/conjuntos/protegidos.txt`, los del conjunto de prueba fijado en la tarea 0.14)
+
+### Resumen
+
+- **total:** 3539 artículos seleccionados
+- **por estrato:** dirigido 2040 · aleatorio 1099 · perfiles 400
+- **por conjunto:** plata 3509 · humo_maestro 30
+- **artículos que disparan cada relación** (un artículo puede disparar más de una):
+
+| relación | artículos |
+|---|---:|
+| ocupa_cargo | 3008 |
+| investigado_por | 1929 |
+| familiar_de | 1906 |
+| dirige | 1766 |
+| apoya_a | 1477 |
+| miembro_de | 1202 |
+| trabaja_en | 1141 |
+| se_opone_a | 851 |
+| contrato_a | 826 |
+| ubicado_en | 761 |
+| propietario_de | 587 |
+| nombro_a | 480 |
+| financia_a | 375 |
+| socio_de | 360 |
+| fundo | 320 |
+| sucedio_a | 285 |
+| parte_de | 269 |
+
+- **hash de `seleccion.jsonl`:** `1b886fa7a32dac821b626eba2c1c0be054c10b0013318cd291e711d30ab1a18f`
+- **hash de `protegidos.txt` (entrada, solo los 50 de prueba):** `6767012275b4fb17b4d4aa205a6df3e2d8134b5d7960df362b5bb31f346480c8`
+
+Esta selección se rehará cuando el usuario entregue los 40 perfiles: sus `doc_id` se añadirán a
+`protegidos.txt` y se volverá a muestrear con la misma semilla (2026); se anotarán entonces ambos
+hashes (el de `protegidos.txt` ampliado y el de la nueva `seleccion.jsonl`).
