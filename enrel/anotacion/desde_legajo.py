@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -32,22 +33,48 @@ def leer_plata_legajo(ruta_jsonl: Path) -> dict[int, list[dict]]:
     return out
 
 
+def _sin_diacriticos(texto: str) -> str:
+    """Como `plegar`, pero sin bajar a minúsculas: la búsqueda de respaldo compara palabras
+    completas y no debe confundir una mención propia («Fiscal») con un sustantivo común
+    («fiscal») solo porque el mayúsculas/minúsculas coincide tras plegar."""
+    t = unicodedata.normalize("NFD", texto)
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+def _limite_de_palabra(texto: str, ini: int, fin: int, buscado: str) -> bool:
+    """La coincidencia no debe quedar pegada a otro carácter alfanumérico.
+
+    Solo se exige el límite en el lado de `buscado` que empieza o termina en un carácter
+    alfanumérico: una mención como «@petrogustavo» o «30 %» no tiene ese límite en el
+    extremo que no lo es. Evita que «Cali» encaje dentro de «California» o «Fiscal»
+    dentro de «Fiscalía».
+    """
+    if buscado and buscado[0].isalnum() and ini > 0 and texto[ini - 1].isalnum():
+        return False
+    if buscado and buscado[-1].isalnum() and fin < len(texto) and texto[fin].isalnum():
+        return False
+    return True
+
+
 def _apariciones(texto_parrafo: str, buscado: str) -> list[tuple[int, int]]:
-    """Todas las apariciones de `buscado` en el párrafo, exactas; si no hay, por palabras plegadas."""
+    """Todas las apariciones de `buscado` en el párrafo, exactas y en límites de palabra,
+    sin solaparse; si no hay ninguna, por palabras completas (sin diacríticos, con mayúsculas)."""
     out, pos = [], 0
     while True:
         i = texto_parrafo.find(buscado, pos)
         if i < 0:
             break
-        out.append((i, i + len(buscado)))
-        pos = i + 1
+        fin = i + len(buscado)
+        if _limite_de_palabra(texto_parrafo, i, fin, buscado):
+            out.append((i, fin))
+        pos = fin  # nunca solapada con la anterior
     if out:
         return out
-    objetivo = [plegar(p) for _, _, p in palabras(buscado)]
+    objetivo = [_sin_diacriticos(p) for _, _, p in palabras(buscado)]
     pals = palabras(texto_parrafo)
     n = len(objetivo)
     for k in range(len(pals) - n + 1):
-        if [plegar(p) for _, _, p in pals[k : k + n]] == objetivo:
+        if [_sin_diacriticos(p) for _, _, p in pals[k : k + n]] == objetivo:
             out.append((pals[k][0], pals[k + n - 1][1]))
     return out
 
@@ -140,25 +167,55 @@ class _Constructor:
         return doc
 
     def _fusionar(self, grupos: list[Grupo], pares_mismos) -> None:
-        """Une grupos que legajo declaró iguales: por `grupo` de anotaciones o por resoluciones «misma»."""
+        """Une grupos que legajo declaró iguales: por `grupo` de anotaciones o por resoluciones «misma».
+
+        Las uniones se acumulan en un union-find para cerrar la transitividad: si (A=B) y
+        (B=C), A, B y C deben terminar en un único grupo aunque nunca se compare A con C
+        directamente.
+        """
         por_id = {g.id: g for g in grupos}
+        padre: dict[str, str] = {g.id: g.id for g in grupos}
+
+        def raiz(x: str) -> str:
+            while padre[x] != x:
+                padre[x] = padre[padre[x]]
+                x = padre[x]
+            return x
+
+        def unir(a: str, b: str) -> None:
+            ra, rb = raiz(a), raiz(b)
+            if ra != rb:
+                padre[ra] = rb
+
         # Por columna grupo: todas las menciones con el mismo valor van juntas.
         por_forzado: dict[str, set[str]] = {}
         for mid, gf in self.grupo_forzado.items():
             m = next(x for x in self.menciones if x.id == mid)
             por_forzado.setdefault(gf, set()).add(m.grupo)
-        uniones = [s for s in por_forzado.values() if len(s) > 1]
-        # Por resoluciones: nombres plegados.
+        for s in por_forzado.values():
+            s = list(s)
+            for otro in s[1:]:
+                unir(s[0], otro)
+
+        # Por resoluciones: nombres plegados, mismo tipo.
         canonicos = {plegar(g.canonico): g.id for g in grupos}
         for a, b in pares_mismos:
             ga, gb = canonicos.get(plegar(a)), canonicos.get(plegar(b))
-            if ga and gb and ga != gb and por_id[ga].tipo == por_id[gb].tipo:
-                uniones.append({ga, gb})
-        for s in uniones:
-            destino = min(s, key=lambda gid: int(gid[1:]))
-            for m in self.menciones:
-                if m.grupo in s:
-                    m.grupo = destino
+            if ga and gb and por_id[ga].tipo == por_id[gb].tipo:
+                unir(ga, gb)
+
+        # El destino de cada componente es el id de grupo más pequeño en él.
+        componentes: dict[str, set[str]] = {}
+        for gid in padre:
+            componentes.setdefault(raiz(gid), set()).add(gid)
+        destino_de: dict[str, str] = {}
+        for miembros in componentes.values():
+            destino = min(miembros, key=lambda gid: int(gid[1:]))
+            for gid in miembros:
+                destino_de[gid] = destino
+
+        for m in self.menciones:
+            m.grupo = destino_de.get(m.grupo, m.grupo)
         vivos = {m.grupo for m in self.menciones}
         grupos[:] = [g for g in grupos if g.id in vivos]
 
