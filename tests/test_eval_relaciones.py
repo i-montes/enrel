@@ -1,4 +1,5 @@
 from enrel.datos.documento import Documento, Grupo, Mencion, Relacion
+from enrel.datos.validar import validar_documento
 from enrel.evaluacion.relaciones import evaluar_relaciones, tripletas_canonicas
 
 
@@ -57,14 +58,20 @@ def test_direccion_invertida_cuenta_como_error_y_en_direccion():
 
 
 def test_re_mas_exige_tipos():
+    # la predicción empareja bien el par por solape (mismos extremos que el oro), pero da
+    # al primer extremo un tipo distinto del que tiene en el oro («persona» en el oro,
+    # «organizacion» en la predicción); `nombro_a` admite organizacion→persona, así que el
+    # documento es válido. RE acierta (empareja y la relación es correcta), RE+ no (los
+    # tipos de los grupos no coinciden con los del oro).
     ms = [
-        Mencion("x", 0, 13, "Gustavo Petro", "persona", "p1"),
-        Mencion("y", 20, 37, "Luis Carlos Reyes", "organizacion", "p2"),
+        Mencion("x", 0, 13, "Gustavo Petro", "organizacion", "p1"),
+        Mencion("y", 20, 37, "Luis Carlos Reyes", "persona", "p2"),
     ]
-    p = pred([Relacion("p1", "p2", "nombro_a")], ms)
-    assert (
-        evaluar_relaciones([ORO], [p], "gruesa", exigir_tipos=False)["nombro_a"].tp == 0
-    )  # tipo distinto: no hay grupo emparejado
+    gs = [Grupo("p1", "organizacion", "Gustavo Petro"), Grupo("p2", "persona", "Luis Carlos Reyes")]
+    texto = "Gustavo Petro" + " " * 7 + "Luis Carlos Reyes" + "x" * 263
+    p = Documento("d", texto, ms, gs, [Relacion("p1", "p2", "nombro_a")])
+    assert validar_documento(p) == []
+    assert evaluar_relaciones([ORO], [p], "gruesa", exigir_tipos=False)["nombro_a"].tp == 1
     assert evaluar_relaciones([ORO], [p], "gruesa", exigir_tipos=True)["nombro_a"].tp == 0
 
 
@@ -81,12 +88,15 @@ def test_re_mas_difiere_de_re_con_tipo_de_grupo_erroneo():
     assert evaluar_relaciones([ORO], [p], "gruesa", exigir_tipos=True)["nombro_a"].tp == 0
 
 
-def test_macro_y_sin_tipo_excluido():
+def test_macro_excluye_sin_tipo_pero_micro_lo_incluye():
     p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p1", "p3", "vinculo_sin_tipo")])
     r = evaluar_relaciones([ORO], [p], "gruesa")
-    assert r["__micro__"].fp == 0  # vinculo_sin_tipo no cuenta en micro
-    assert "vinculo_sin_tipo" in r
-    assert 0 < r["__macro__"].f1 < 1
+    assert "vinculo_sin_tipo" in r and r["vinculo_sin_tipo"].fp == 1
+    # `vinculo_sin_tipo` es la reserva (clase 18), no «sin relación»: micro la cuenta ahora,
+    # así que su falso positivo entra en `__micro__` pero no en `__micro_sin_reserva__`.
+    assert r["__micro__"].fp == 1
+    assert r["__micro_sin_reserva__"].fp == 0
+    assert 0 < r["__macro__"].f1 < 1  # macro sigue excluyendo la reserva
 
 
 def test_ign():

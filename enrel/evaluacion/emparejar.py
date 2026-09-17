@@ -1,5 +1,6 @@
 """Emparejamiento de menciones y grupos entre oro y predicción, y el contador P/R/F1."""
 
+import warnings
 from dataclasses import dataclass
 
 from enrel.datos.documento import Documento, Mencion
@@ -64,14 +65,25 @@ def emparejar_menciones(oro: list[Mencion], pred: list[Mencion], modo: str) -> l
 
 
 def emparejar_grupos(oro: Documento, pred: Documento) -> dict[str, str | None]:
+    """Empareja cada grupo de oro con el grupo predicho por mayoría de menciones solapadas.
+
+    El voto es por SOLAPE de menciones, sin filtrar por tipo: si se filtrara por tipo (como
+    antes), el grupo emparejado siempre tendría el tipo correcto y `exigir_tipos` en
+    `evaluacion/relaciones.py` (RE+) nunca se dispararía, haciendo a RE+ indistinguible de
+    RE. Con este emparejamiento, RE mide «extremos correctos por solape y relación
+    correcta», y RE+ añade «y los tipos de los grupos coinciden con los del oro».
+
+    Desempate determinista: gana el grupo con más menciones solapadas y, en empate, el de
+    id lexicográficamente menor.
+    """
     out: dict[str, str | None] = {}
     for g in oro.grupos:
         votos: dict[str, int] = {}
         for mo in oro.menciones_de(g.id):
             for mp in pred.menciones:
-                if mp.tipo == g.tipo and solapan(mo, mp):
+                if solapan(mo, mp):
                     votos[mp.grupo] = votos.get(mp.grupo, 0) + 1
-        out[g.id] = max(votos, key=votos.get) if votos else None
+        out[g.id] = min(votos, key=lambda gid: (-votos[gid], gid)) if votos else None
     return out
 
 
@@ -84,4 +96,12 @@ def alinear(oro_docs: list[Documento], pred_docs: list[Documento]) -> list[tuple
     faltan = [d.doc_id for d in oro_docs if d.doc_id not in pred]
     if faltan:
         raise ValueError(f"la predicción no trae {len(faltan)} documentos del oro, por ejemplo {faltan[:3]}")
+    ids_oro = {d.doc_id for d in oro_docs}
+    de_mas = [doc_id for doc_id in pred if doc_id not in ids_oro]
+    if de_mas:
+        warnings.warn(
+            f"la predicción trae {len(de_mas)} documentos que no están en el oro y se descartan,"
+            f" por ejemplo {de_mas[:3]}",
+            stacklevel=2,
+        )
     return [(d, pred[d.doc_id]) for d in oro_docs]

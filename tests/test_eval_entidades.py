@@ -1,5 +1,7 @@
+import pytest
+
 from enrel.datos.documento import Documento, Grupo, Mencion
-from enrel.evaluacion.emparejar import PRF, emparejar_grupos, emparejar_menciones
+from enrel.evaluacion.emparejar import PRF, alinear, emparejar_grupos, emparejar_menciones
 from enrel.evaluacion.entidades import evaluar_entidades
 
 
@@ -58,3 +60,14 @@ def test_emparejar_grupos():
     )
     m = emparejar_grupos(oro, pred)
     assert m["g1"] in ("p1", "p9") and m["g2"] == "p2"
+
+
+def test_alinear_avisa_de_documentos_de_mas():
+    oro = [doc("d1", [Mencion("a", 0, 5, "Cali", "lugar", "g1")])]
+    pred = [
+        doc("d1", [Mencion("x", 0, 5, "Cali", "lugar", "p1")]),
+        doc("d2", [Mencion("y", 0, 5, "Cali", "lugar", "p1")]),
+    ]
+    with pytest.warns(UserWarning, match="d2"):
+        pares = alinear(oro, pred)
+    assert [o.doc_id for o, _ in pares] == ["d1"]
