@@ -28,6 +28,26 @@ El total congelado (63991) queda dentro del rango esperado (55.000–70.000).
 
 ## Por sección (29 secciones)
 
+<!--
+Tabla generada desde datos/corpus/articulos.resumen.json (secciones con >= 5 artículos en filas propias,
+el resto agrupado en "otras N secciones") con este script de una sola vez:
+
+  python3 -c "
+  import json
+  r = json.load(open('datos/corpus/articulos.resumen.json', encoding='utf-8'))
+  secciones = r['por_seccion']
+  principales = [(s, n) for s, n in secciones.items() if n >= 5]
+  resto = [(s, n) for s, n in secciones.items() if n < 5]
+  for s, n in principales:
+      print(f'| {s} | {n} |')
+  print(f'| otras {len(resto)} secciones | {sum(n for _, n in resto)} |')
+  suma = sum(n for _, n in principales) + sum(n for _, n in resto)
+  print('comprobación:', suma, '==', r['total'], suma == r['total'])
+  "
+
+Comprobación de esa corrida: suma de la tabla = 63991; total del resumen = 63991; OK.
+-->
+
 | sección | artículos |
 |---|---|
 | en-vivo | 25363 |
@@ -40,7 +60,12 @@ El total congelado (63991) queda dentro del rango esperado (55.000–70.000).
 | podcasts | 1236 |
 | silla-academica | 79 |
 | silla-datos | 48 |
-| (18 secciones adicionales con 1 artículo cada una, en su mayoría slugs sueltos sin sección real) | 18 |
+| especiales | 15 |
+| sobre-nosotros | 9 |
+| otras 17 secciones (con 1 artículo cada una, en su mayoría slugs sueltos sin sección real) | 17 |
+| **total** | **63991** |
+
+Suma de la tabla: 25363+14289+11078+5902+3258+1353+1344+1236+79+48+15+9+17 = 63991, igual al `total` del resumen.
 
 ## Por tramo
 
