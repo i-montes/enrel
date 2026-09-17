@@ -116,7 +116,7 @@ Clasificación de tramos. Para cada tramo de 1 a 16 palabras se construye una re
 Reglas, no modelo, en `enrel/inferencia/agrupar.py`:
 
 1. Misma cadena normalizada (NFC, minúsculas, sin tildes, espacios colapsados) y mismo tipo.
-2. Personas: una mención es forma corta de otra si sus palabras aparecen en orden dentro de la larga («Carlos Galán» dentro de «Carlos Fernando Galán»), o si es un solo apellido que aparece como último apellido en una sola persona del documento.
+2. Personas: una mención es forma corta de otra si sus palabras aparecen en orden dentro de la larga («Carlos Galán» dentro de «Carlos Fernando Galán») y la primera palabra coincide (la forma corta conserva el primer nombre), con un único candidato largo, o si es un solo apellido que aparece como último apellido en una sola persona del documento.
 3. Organizaciones: sigla y forma larga si la sigla coincide con las iniciales de las palabras con mayúscula de la forma larga; forma corta contenida en la larga.
 4. Cargos, normas, montos y obras solo por regla 1.
 5. Diccionario opcional de alias (los perfiles de Quién-AI, 21.253 nombres normalizados) que el usuario puede cargar o no.

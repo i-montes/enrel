@@ -1,6 +1,17 @@
 # Texto del archivo y anotaciones: no se publican en el repo de código
-datos-anteriores/
-datos/
+/datos-anteriores/
+/datos/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# Entorno de desarrollo y artefactos de Python
+.venv/
+__pycache__/
+*.egg-info/
+corridas/
+.ruff_cache/
+.pytest_cache/
+
+# Espacio de trabajo del orquestador
+.superpowers/
