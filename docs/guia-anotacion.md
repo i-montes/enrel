@@ -13,6 +13,7 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Una relación se marca una sola vez por par de entidades y tipo, aunque el texto la repita. Las simétricas, en una sola dirección.
 - Si dos relaciones aplican al mismo par, se elige la más específica. Si el texto afirma dos hechos distintos (dirige y fundó), se marcan las dos.
 - El título del artículo forma parte del texto y sus entidades se marcan.
+- Los offsets de las menciones son de caracteres sobre el texto normalizado a NFC; los nombres se comparan con NFC y nunca se guardan índices de tokens.
 
 ## Tipos de entidad
 

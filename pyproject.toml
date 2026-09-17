@@ -33,6 +33,7 @@ packages = ["enrel"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-m 'not gpu and not red'"
 markers = [
     "gpu: necesita GPU",
