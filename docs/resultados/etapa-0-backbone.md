@@ -25,6 +25,8 @@ La exportación a ONNX de MrBERT-es (arquitectura ModernBERT) funcionó con la a
 
 Criterio: carga sin errores; paso GPU con VRAM pico < 8 GB; diferencia torch-ONNX < 1e-3; mediana int8 < 3 s por ~1.500 tokens con 4 hilos. Si se cumple, el respaldo se mide solo como referencia.
 
+**Nota sobre el RSS reportado**: el `rss_gb` de las tablas CPU fp32/CPU int8 es la memoria residente de todo el proceso de `scripts/humo_backbone.py` (`resource.getrusage(RUSAGE_SELF)`), que en la misma ejecución carga torch, transformers y ONNX Runtime, y va cargando sucesivamente los dos modelos (fp32 e int8) de MrBERT-es y después los del respaldo. No es la memoria del pipeline final en CPU: esa se medirá en la etapa 3 con un proceso que solo cargue ONNX Runtime y un único modelo, y será notablemente menor que los 6,03 GB aquí reportados.
+
 ## jhu-clsp/mmBERT-small
 
 **Carga**: modelo = jhu-clsp/mmBERT-small, parametros = 140493696, vocabulario = 256000, max_posiciones = 8192

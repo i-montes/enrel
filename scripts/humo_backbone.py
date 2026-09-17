@@ -225,6 +225,14 @@ def main():
                 "diferencia torch-ONNX < 1e-3; mediana int8 < 3 s por ~1.500 tokens con 4 hilos. "
                 "Si se cumple, el respaldo se mide solo como referencia.\n"
             )
+            partes.append(
+                "\n**Nota sobre el RSS reportado**: el `rss_gb` de las tablas CPU fp32/CPU int8 es la "
+                "memoria residente de todo este proceso (`resource.getrusage(RUSAGE_SELF)`), que carga "
+                "torch, transformers y ONNX Runtime, y va cargando sucesivamente los dos modelos "
+                "(fp32 e int8) del modelo principal y después los del respaldo. No es la memoria del "
+                "pipeline final en CPU: esa se medirá en la etapa 3 con un proceso que solo cargue "
+                "ONNX Runtime y un único modelo.\n"
+            )
     Path(a.salida).write_text("\n".join(partes), encoding="utf-8")
     print(Path(a.salida).read_text(encoding="utf-8"))
 
