@@ -1,0 +1,109 @@
+"""Evaluación de relaciones sobre grupos emparejados: RE, RE+, nivel fino, micro, macro, dirección e Ign."""
+
+from enrel.datos.documento import Documento, Relacion
+from enrel.datos.normalizar import plegar
+from enrel.esquema.tipos import SIN_TIPO, clase_fina, es_simetrica
+from enrel.evaluacion.emparejar import PRF, alinear, emparejar_grupos
+
+
+def _etiqueta(r: Relacion, nivel: str) -> str:
+    return clase_fina(r.relacion, r.atributo) if nivel == "fina" else r.relacion
+
+
+def _canonica(doc: Documento, r: Relacion, nivel: str) -> tuple[str, str, str]:
+    a, b = plegar(doc.grupo_de(r.cabeza).canonico), plegar(doc.grupo_de(r.cola).canonico)
+    if es_simetrica(r.relacion, r.atributo):
+        a, b = sorted((a, b))
+    return a, _etiqueta(r, nivel), b
+
+
+def tripletas_canonicas(docs: list[Documento], nivel: str = "gruesa") -> set[tuple[str, str, str]]:
+    return {_canonica(d, r, nivel) for d in docs for r in d.relaciones}
+
+
+class _Macro(PRF):
+    """Un `PRF` sintético cuyo `f1` es fijo: la media de los F1 por etiqueta (`tp`/`fp`/`fn` quedan en 0)."""
+
+    def __init__(self, f1: float):
+        super().__init__()
+        self._f1 = f1
+
+    @property
+    def f1(self) -> float:
+        return self._f1
+
+
+def evaluar_relaciones(
+    oro: list[Documento],
+    pred: list[Documento],
+    nivel: str = "gruesa",
+    exigir_tipos: bool = False,
+    ignorar: set[tuple] | None = None,
+) -> dict[str, PRF]:
+    ignorar = ignorar or set()
+    por_etiqueta: dict[str, PRF] = {}
+    direccion = PRF()
+
+    def prf(etiqueta: str) -> PRF:
+        return por_etiqueta.setdefault(etiqueta, PRF())
+
+    for o, p in alinear(oro, pred):
+        mapa = emparejar_grupos(o, p)
+        tipos_pred = {g.id: g.tipo for g in p.grupos}
+        libres = list(p.relaciones)
+        consumidas: set[int] = set()
+
+        for ro in o.relaciones:
+            if _canonica(o, ro, nivel) in ignorar:
+                continue
+            et = _etiqueta(ro, nivel)
+            simetrica = es_simetrica(ro.relacion, ro.atributo)
+            gc, gl = mapa.get(ro.cabeza), mapa.get(ro.cola)
+            if gc is not None and gl is not None and exigir_tipos:
+                if tipos_pred[gc] != o.grupo_de(ro.cabeza).tipo or tipos_pred[gl] != o.grupo_de(ro.cola).tipo:
+                    gc = gl = None
+
+            acierto = None
+            invertida = None
+            if gc is not None and gl is not None:
+                for k, rp in enumerate(libres):
+                    if k in consumidas or _etiqueta(rp, nivel) != et:
+                        continue
+                    if (rp.cabeza, rp.cola) == (gc, gl):
+                        acierto = k
+                        break
+                    if (rp.cabeza, rp.cola) == (gl, gc):
+                        if simetrica:
+                            acierto = k
+                            break
+                        invertida = k
+
+            if acierto is not None:
+                consumidas.add(acierto)
+                prf(et).tp += 1
+                if not simetrica:
+                    direccion.tp += 1
+            else:
+                prf(et).fn += 1
+                if invertida is not None:
+                    direccion.fn += 1
+
+        for k, rp in enumerate(libres):
+            if k in consumidas:
+                continue
+            if _canonica(p, rp, nivel) in ignorar:
+                continue
+            prf(_etiqueta(rp, nivel)).fp += 1
+
+    micro = PRF()
+    f1s = []
+    for etiqueta, x in por_etiqueta.items():
+        if etiqueta == SIN_TIPO:
+            continue
+        micro.sumar(x)
+        if x.n >= 1:
+            f1s.append(x.f1)
+    por_etiqueta["__micro__"] = micro
+    por_etiqueta["__macro__"] = _Macro(sum(f1s) / len(f1s) if f1s else 0.0)
+    por_etiqueta["__direccion__"] = direccion
+    return por_etiqueta
