@@ -1,4 +1,13 @@
-"""Evaluación de relaciones sobre grupos emparejados: RE, RE+, nivel fino, micro, macro, dirección e Ign."""
+"""Evaluación de relaciones sobre grupos emparejados: RE, RE+, nivel fino, micro, macro, dirección e Ign.
+
+Asimetría deliberada entre micro y macro sobre `vinculo_sin_tipo` (clase 18 del esquema, la
+reserva para vínculos reales que no encajan en ninguna de las 17 relaciones — no es «sin
+relación», que la representa el umbral del modelo, no esta clase): `__micro__` la INCLUYE,
+para que un maestro que vuelque en la reserva lo que no sabe clasificar pague sus falsos
+positivos igual que cualquier otra clase. `__micro_sin_reserva__` la excluye, para poder
+comparar. `__macro__` sigue excluyéndola siempre: una media de F1 por clase no debe dejarse
+dominar por una clase que por definición no tiene un límite claro de qué admite.
+"""
 
 from enrel.datos.documento import Documento, Relacion
 from enrel.datos.normalizar import plegar
@@ -96,14 +105,16 @@ def evaluar_relaciones(
             prf(_etiqueta(rp, nivel)).fp += 1
 
     micro = PRF()
+    micro_sin_reserva = PRF()
     f1s = []
     for etiqueta, x in por_etiqueta.items():
-        if etiqueta == SIN_TIPO:
-            continue
         micro.sumar(x)
-        if x.n >= 1:
-            f1s.append(x.f1)
+        if etiqueta != SIN_TIPO:
+            micro_sin_reserva.sumar(x)
+            if x.n >= 1:
+                f1s.append(x.f1)
     por_etiqueta["__micro__"] = micro
+    por_etiqueta["__micro_sin_reserva__"] = micro_sin_reserva
     por_etiqueta["__macro__"] = _Macro(sum(f1s) / len(f1s) if f1s else 0.0)
     por_etiqueta["__direccion__"] = direccion
     return por_etiqueta
