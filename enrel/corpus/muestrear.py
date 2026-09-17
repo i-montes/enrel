@@ -89,6 +89,13 @@ def muestrear(
     for s in rng.sample(sel, min(humo, len(sel))):
         s.conjunto = "humo_maestro"
     sel.sort(key=lambda s: s.doc_id)
+
+    # Barrera redundante y barata: `_leer` ya descarta los `doc_id` de `excluir`, pero si
+    # algo se coló (por ejemplo, un `doc_id` con espacios o mayúsculas distintas) queremos
+    # que la fuga aborte aquí, no que se filtre en silencio hasta la selección final.
+    fugas = sorted({s.doc_id for s in sel} & excluir)
+    if fugas:
+        raise RuntimeError(f"la selección incluye {len(fugas)} doc_id excluidos, por ejemplo {fugas[:3]}")
     return sel
 
 

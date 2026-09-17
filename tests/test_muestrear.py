@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from enrel.corpus import muestrear as mu
 
 
@@ -56,6 +58,21 @@ def test_reproducible(tmp_path):
     a = mu.muestrear(corpus, set(), semilla=7, cuota_relacion=3, perfiles=5, aleatorios=10, humo=2)
     b = mu.muestrear(corpus, set(), semilla=7, cuota_relacion=3, perfiles=5, aleatorios=10, humo=2)
     assert [s.doc_id for s in a] == [s.doc_id for s in b]
+
+
+def test_fuga_detectada_lanza_runtimeerror(tmp_path, monkeypatch):
+    corpus = _corpus(tmp_path, 20)
+    # `_leer` ya filtra `excluir`, así que para probar la barrera redundante la forzamos:
+    # un `_leer` que ignora la exclusión, de modo que un doc_id excluido pueda colarse hasta
+    # la selección final y dispare el `RuntimeError`.
+    original_leer = mu._leer
+
+    def leer_sin_filtrar(corpus, excluir):
+        return original_leer(corpus, set())
+
+    monkeypatch.setattr(mu, "_leer", leer_sin_filtrar)
+    with pytest.raises(RuntimeError):
+        mu.muestrear(corpus, excluir={"wp:0"}, semilla=1, cuota_relacion=20, perfiles=20, aleatorios=20, humo=0)
 
 
 def test_guardar_y_cargar(tmp_path):

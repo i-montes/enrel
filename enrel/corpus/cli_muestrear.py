@@ -12,8 +12,14 @@ def muestrear_cmd(args):
     excluir: set[str] = set()
     if args.excluir:
         ruta = Path(args.excluir)
-        if ruta.exists():
-            excluir = {linea.strip() for linea in ruta.read_text(encoding="utf-8").splitlines() if linea.strip()}
+        if not ruta.exists():
+            raise SystemExit(
+                f"--excluir apunta a un fichero que no existe: {ruta}. "
+                "Si de verdad quieres muestrear sin exclusión, no pases --excluir."
+            )
+        excluir = {linea.strip() for linea in ruta.read_text(encoding="utf-8").splitlines() if linea.strip()}
+    else:
+        print("aviso: sin --excluir, la muestra no protege ningún doc_id de fugas")
 
     sel = muestrear(
         Path(args.corpus),
@@ -30,7 +36,7 @@ def muestrear_cmd(args):
 
 def _configurar(p):
     p.add_argument("--corpus", default="datos/corpus/articulos.jsonl")
-    p.add_argument("--excluir", default="datos/conjuntos/protegidos.txt")
+    p.add_argument("--excluir", default=None)
     p.add_argument("--salida", default="datos/conjuntos/seleccion.jsonl")
     p.add_argument("--semilla", type=int, default=2026)
     p.add_argument("--cuota-relacion", type=int, default=120)
