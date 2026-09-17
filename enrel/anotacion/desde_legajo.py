@@ -296,7 +296,13 @@ def documento_desde_plata_legajo(filas: list[dict], articulo: Articulo) -> Docum
                 c.origen["no_localizadas"] += 1
                 ids.append(None)
                 continue
-            ids.append(c.mencion(pi, e["ini"], e["fin"], e["texto"], e["tipo"]).id)
+            try:
+                ids.append(c.mencion(pi, e["ini"], e["fin"], e["texto"], e["tipo"]).id)
+            except ValueError:
+                # tipo del prompt nuevo sin equivalente en el esquema (p. ej. «grupo generico»,
+                # un colectivo sin nombre propio): se descarta solo esa mención, no el documento.
+                c.origen["no_localizadas"] += 1
+                ids.append(None)
         for r in fila.get("relaciones", []):
             a, b = ids[r["a"]] if r["a"] < len(ids) else None, ids[r["b"]] if r["b"] < len(ids) else None
             if a and b:
