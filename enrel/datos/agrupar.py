@@ -1,5 +1,8 @@
 """Agrupa las menciones de un documento en entidades, por reglas (spec §4.3)."""
 
+from collections import defaultdict
+from itertools import combinations
+
 from enrel.datos.documento import Grupo, Mencion
 from enrel.datos.normalizar import plegar
 
@@ -57,6 +60,11 @@ class _Union:
 
 
 def agrupar(menciones: list[Mencion], alias: dict[str, str] | None = None) -> list[Grupo]:
+    """Agrupa `menciones` en entidades y MUTA el campo `grupo` de cada una con el id asignado.
+
+    Devuelve la lista de `Grupo` (una por entidad). Efecto secundario deliberado: las
+    `Mencion` que se reciben quedan modificadas in place, no se copian.
+    """
     n = len(menciones)
     uf = _Union(n)
     plegadas = [plegar(m.texto) for m in menciones]
@@ -94,16 +102,27 @@ def agrupar(menciones: list[Mencion], alias: dict[str, str] | None = None) -> li
             if len(candidatos) == 1:
                 uf.unir(i, candidatos.pop())
 
-    # Regla 3: organizaciones.
+    # Regla 3: organizaciones. Para cada par se decide cuál es la forma corta (menos
+    # palabras) y se comprueba sigla-igual-a-iniciales o secuencia-contenida en ese sentido;
+    # cada par no ordenado se examina una sola vez. Igual que en la regla 2, la forma corta
+    # se une a la larga solo si hay una única candidata: «EPM» con «Empresas Públicas de
+    # Medellín» y «Escuela Popular de Música» presentes no se une a ninguna (ambigüedad
+    # real), evitando que se fusionen organizaciones distintas.
     orgs = [i for i in range(n) if menciones[i].tipo == "organizacion"]
-    for i in orgs:
-        for j in orgs:
-            if i == j:
-                continue
-            if _es_sigla(menciones[i].texto) and menciones[i].texto.replace(".", "") == _sigla_de(menciones[j].texto):
-                uf.unir(i, j)
-            elif _secuencia_contenida(palabras[i], palabras[j]):
-                uf.unir(i, j)
+    candidatas: dict[int, set[int]] = defaultdict(set)
+    for a, b in combinations(orgs, 2):
+        if len(palabras[a]) == len(palabras[b]):
+            continue
+        corta, larga = (a, b) if len(palabras[a]) < len(palabras[b]) else (b, a)
+        es_sigla_de_larga = _es_sigla(menciones[corta].texto) and menciones[corta].texto.replace(".", "") == _sigla_de(
+            menciones[larga].texto
+        )
+        if es_sigla_de_larga or _secuencia_contenida(palabras[corta], palabras[larga]):
+            candidatas[corta].add(larga)
+    for i, largas in candidatas.items():
+        raices = {uf.raiz(j) for j in largas}
+        if len(raices) == 1:
+            uf.unir(i, raices.pop())
 
     # Ids en orden de primera aparición; canónico = la mención más larga.
     grupos: list[Grupo] = []

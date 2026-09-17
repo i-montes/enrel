@@ -47,6 +47,33 @@ def test_organizacion_sigla_y_forma_corta():
     assert ms[0].grupo != ms[2].grupo
 
 
+def test_organizacion_sigla_ambigua_no_se_une():
+    # «EPM» es sigla tanto de «Empresas Públicas de Medellín» como de «Escuela Popular de
+    # Música»: dos candidatas, ambigüedad real, no se une a ninguna.
+    ms = [
+        m(1, "Empresas Públicas de Medellín", "organizacion"),
+        m(2, "Escuela Popular de Música", "organizacion"),
+        m(3, "EPM", "organizacion"),
+    ]
+    agrupar(ms)
+    assert ms[2].grupo not in (ms[0].grupo, ms[1].grupo)
+    assert ms[0].grupo != ms[1].grupo
+
+
+def test_organizacion_forma_corta_ambigua_no_encadena():
+    # «Cámara» es secuencia contenida tanto de «Comisión III Cámara» como de «Comisión IV
+    # Cámara»: no se une a ninguna, y las dos comisiones (mismo número de palabras entre sí)
+    # tampoco se unen entre ellas.
+    ms = [
+        m(1, "Cámara", "organizacion"),
+        m(2, "Comisión III Cámara", "organizacion"),
+        m(3, "Comisión IV Cámara", "organizacion"),
+    ]
+    agrupar(ms)
+    assert ms[0].grupo not in (ms[1].grupo, ms[2].grupo)
+    assert ms[1].grupo != ms[2].grupo
+
+
 def test_cargos_solo_por_cadena():
     ms = [m(1, "ministro de Hacienda", "cargo"), m(2, "ministro", "cargo")]
     agrupar(ms)
