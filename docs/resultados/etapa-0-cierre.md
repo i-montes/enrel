@@ -24,8 +24,9 @@ detalle están en `docs/resultados/etapa-0-corpus.md` (corpus congelado y selecc
 | Selección de plata, total | 3.539 (dirigido 2.040 · perfiles 400 · aleatorio 1.099; 30 de humo del maestro) |
 | Entidades, F1 estricto (techo del maestro de legajo, esquema nuevo, prueba) | 0,75 [0,71, 0,78] |
 | Entidades, F1 parcial | 0,78 |
-| RE+, F1 micro | 0,56 [0,50, 0,61] |
-| RE+, F1 micro a clases finas | 0,53 |
+| RE+, F1 micro (incluye `vinculo_sin_tipo`) | 0,50 [0,45, 0,55] |
+| RE+, F1 micro sin reserva (excluye `vinculo_sin_tipo`) | 0,53 |
+| RE+, F1 micro a clases finas (incluye `vinculo_sin_tipo`) | 0,48 |
 | Backbone: parámetros | 149,7 M |
 | Backbone: tokens por palabra | 1,35 |
 | Backbone: p95 tokens | 1.206 |
@@ -37,6 +38,10 @@ detalle están en `docs/resultados/etapa-0-corpus.md` (corpus congelado y selecc
 Decisión de backbone: sigue `MrBERT-es`. Aviso: la cuantización dinámica a int8 (`quantize_dynamic`) degrada
 notablemente la salida de este backbone (diferencia máxima muy por encima del umbral de referencia); no bloquea
 el humo de velocidad, pero la ruta de despliegue int8 se decide en la etapa 3 con el modelo ya entrenado.
+
+Nota (ronda de arreglos finales): RE y RE+ ahora se distinguen de verdad (antes `emparejar_grupos` filtraba por
+tipo y RE+ nunca podía diferir de RE), y el micro ahora incluye la reserva `vinculo_sin_tipo`; las cifras de esta
+tabla y de `docs/resultados/etapa-0-legajo.md` reflejan ese cambio.
 
 ## Pendiente: cuando el usuario cierre el lote de los 40 perfiles
 

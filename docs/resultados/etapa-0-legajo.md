@@ -53,25 +53,26 @@ Fecha: 2026-09-17 · documentos: 50
 |---|---:|---:|---:|---:|---|
 | apoya_a | 39 | 0.65 | 0.33 | 0.44 |  |
 | contrato_a | 3 | insuficiente | insuficiente | insuficiente |  |
-| dirige | 40 | 0.53 | 0.20 | 0.29 |  |
+| dirige | 40 | 0.47 | 0.17 | 0.25 |  |
 | familiar_de | 19 | 0.73 | 0.84 | 0.78 |  |
 | financia_a | 1 | insuficiente | insuficiente | insuficiente |  |
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
-| miembro_de | 56 | 0.50 | 0.52 | 0.51 |  |
+| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo | 246 | 0.80 | 0.64 | 0.71 |  |
+| ocupa_cargo | 246 | 0.75 | 0.60 | 0.67 |  |
 | parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
 | se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
-| trabaja_en | 18 | 0.30 | 0.50 | 0.37 |  |
+| trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
-| vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 505 | 0.59 | 0.53 | 0.56 | [0.50, 0.61] |
-| macro | 0 | 0.00 | 0.00 | 0.47 |  |
-| direccion | 263 | 1.00 | 0.98 | 0.99 |  |
+| vinculo_sin_tipo | 26 | 0.20 | 0.38 | 0.26 |  |
+| micro | 531 | 0.52 | 0.49 | 0.51 | [0.46, 0.55] |
+| micro sin reserva | 505 | 0.56 | 0.50 | 0.53 |  |
+| macro |  |  |  | 0.45 |  |
+| direccion (tasa = R) | 249 |  | 0.98 |  |  |
 
 ### Relaciones gruesas, RE+
 
@@ -79,25 +80,26 @@ Fecha: 2026-09-17 · documentos: 50
 |---|---:|---:|---:|---:|---|
 | apoya_a | 39 | 0.65 | 0.33 | 0.44 |  |
 | contrato_a | 3 | insuficiente | insuficiente | insuficiente |  |
-| dirige | 40 | 0.53 | 0.20 | 0.29 |  |
+| dirige | 40 | 0.47 | 0.17 | 0.25 |  |
 | familiar_de | 19 | 0.73 | 0.84 | 0.78 |  |
 | financia_a | 1 | insuficiente | insuficiente | insuficiente |  |
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
-| miembro_de | 56 | 0.50 | 0.52 | 0.51 |  |
+| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo | 246 | 0.80 | 0.64 | 0.71 |  |
+| ocupa_cargo | 246 | 0.75 | 0.60 | 0.67 |  |
 | parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
 | se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
-| trabaja_en | 18 | 0.30 | 0.50 | 0.37 |  |
+| trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
 | vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 505 | 0.59 | 0.53 | 0.56 | [0.50, 0.61] |
-| macro | 0 | 0.00 | 0.00 | 0.47 |  |
-| direccion | 263 | 1.00 | 0.98 | 0.99 |  |
+| micro | 531 | 0.52 | 0.49 | 0.50 | [0.45, 0.55] |
+| micro sin reserva | 505 | 0.56 | 0.50 | 0.53 |  |
+| macro |  |  |  | 0.45 |  |
+| direccion (tasa = R) | 248 |  | 0.98 |  |  |
 
 ### Relaciones finas, RE+
 
@@ -105,7 +107,7 @@ Fecha: 2026-09-17 · documentos: 50
 |---|---:|---:|---:|---:|---|
 | apoya_a | 39 | 0.65 | 0.33 | 0.44 |  |
 | contrato_a | 3 | insuficiente | insuficiente | insuficiente |  |
-| dirige | 40 | 0.53 | 0.20 | 0.29 |  |
+| dirige | 40 | 0.47 | 0.17 | 0.25 |  |
 | familiar_de:conyuge | 1 | insuficiente | insuficiente | insuficiente |  |
 | familiar_de:hermano | 6 | insuficiente | insuficiente | insuficiente |  |
 | familiar_de:hijo_de | 8 | insuficiente | insuficiente | insuficiente |  |
@@ -114,19 +116,20 @@ Fecha: 2026-09-17 · documentos: 50
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por:condenado | 0 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por:investigado | 18 | 1.00 | 0.11 | 0.20 |  |
-| miembro_de | 56 | 0.50 | 0.52 | 0.51 |  |
+| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo:actual | 165 | 0.82 | 0.58 | 0.68 |  |
-| ocupa_cargo:anterior | 70 | 0.69 | 0.64 | 0.67 |  |
+| ocupa_cargo:actual | 165 | 0.77 | 0.54 | 0.63 |  |
+| ocupa_cargo:anterior | 70 | 0.65 | 0.60 | 0.62 |  |
 | ocupa_cargo:aspirante | 11 | 0.41 | 0.64 | 0.50 |  |
 | parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
 | se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
-| trabaja_en | 18 | 0.30 | 0.50 | 0.37 |  |
+| trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
 | vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 505 | 0.57 | 0.50 | 0.53 |  |
-| macro | 0 | 0.00 | 0.00 | 0.49 |  |
-| direccion | 252 | 1.00 | 0.98 | 0.99 |  |
+| micro | 531 | 0.50 | 0.47 | 0.48 |  |
+| micro sin reserva | 505 | 0.53 | 0.48 | 0.50 |  |
+| macro |  |  |  | 0.47 |  |
+| direccion (tasa = R) | 238 |  | 0.97 |  |  |
