@@ -1,0 +1,6 @@
+# Texto del archivo y anotaciones: no se publican en el repo de código
+datos-anteriores/
+datos/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
