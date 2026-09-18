@@ -4,7 +4,7 @@
 
 **Objetivo:** construir el modelo (backbone MrBERT-es más una cabeza de tramos para entidades y una cabeza de pares para relaciones a nivel de documento), la conversión de documentos a tensores, el bucle de entrenamiento con parada por RE+ en desarrollo, la prueba de cordura, la inferencia de extremo a extremo con agrupación por reglas, el CLI `enrel extraer`, y el primer entrenamiento con la plata evaluado con la tabla completa.
 
-**Arquitectura:** un codificador compartido; cabeza de entidades por clasificación de tramos de hasta 16 palabras con representación inicio+fin+anchura; cabeza de relaciones por pares ordenados de grupos con agregación logsumexp de menciones, contexto local por atención aprendida sobre el documento, clasificador bilineal agrupado sobre 24 clases finas más una clase umbral (ATLOP), máscara de tipos, pérdida de umbral adaptativo con reponderación por clase; una cabeza pequeña aparte, sobre la misma representación del par, predice la vigencia (vigente, pasada, futura) con su propia pérdida y un peso configurable, sin multiplicar las clases finas por tres. Todo opera sobre el documento entero, con recorte a 4.096 tokens en entrenamiento y ventanas en inferencia.
+**Arquitectura:** un codificador compartido; cabeza de entidades por clasificación de tramos de hasta 16 palabras con representación inicio+fin+anchura; cabeza de relaciones por pares ordenados de grupos con agregación logsumexp de menciones, contexto local por atención aprendida sobre el documento, clasificador bilineal agrupado sobre 25 clases finas más una clase umbral (ATLOP), máscara de tipos, pérdida de umbral adaptativo con reponderación por clase; una cabeza pequeña aparte, sobre la misma representación del par, predice la vigencia (vigente, pasada, futura) con su propia pérdida y un peso configurable, sin multiplicar las clases finas por tres. Todo opera sobre el documento entero, con recorte a 4.096 tokens en entrenamiento y ventanas en inferencia.
 
 **Tecnologías:** `torch` con CUDA, `transformers` (ModernBERT), `pyyaml`, `numpy`. Reutiliza etapa 0 (`Documento`, `agrupar`, evaluación) y etapa 1 (filtros).
 
@@ -278,9 +278,9 @@ git commit -m "Añade la carga del backbone"
 - Test: `tests/test_modelo_entidades.py`
 
 **Interfaces:**
-- `N_TIPOS = 7`; `NINGUNO = 7` (índice de la clase «ninguno»); `TIPO_A_INDICE = {t: i for i, t in enumerate(TIPOS)}`.
+- `N_TIPOS = 5`; `NINGUNO = 5` (índice de la clase «ninguno»); `TIPO_A_INDICE = {t: i for i, t in enumerate(TIPOS)}`.
 - `enumerar_tramos(n_palabras: int, max_ancho: int = 16) -> torch.LongTensor [S, 2]`: todos los `(i, j)` con `0 <= i <= j < n_palabras` y `j - i < max_ancho`.
-- `class CabezaEntidades(nn.Module)`: `__init__(hidden: int, max_ancho: int = 16, n_tipos: int = 7, dim_ancho: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], primera: LongTensor [B, P] (índice de subpalabra de la primera de cada palabra, rellenado con 0), ultima: LongTensor [B, P], tramos: LongTensor [B, S, 2] (índices de palabra, rellenados con 0), mascara_tramos: BoolTensor [B, S]) -> logits [B, S, n_tipos + 1]`. Representación: `concat(estados[primera[i]], estados[ultima[j]], emb_ancho(j - i))` → `Linear(2H + dim_ancho, H) → GELU → Dropout → Linear(H, n_tipos + 1)`.
+- `class CabezaEntidades(nn.Module)`: `__init__(hidden: int, max_ancho: int = 16, n_tipos: int = 5, dim_ancho: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], primera: LongTensor [B, P] (índice de subpalabra de la primera de cada palabra, rellenado con 0), ultima: LongTensor [B, P], tramos: LongTensor [B, S, 2] (índices de palabra, rellenados con 0), mascara_tramos: BoolTensor [B, S]) -> logits [B, S, n_tipos + 1]`. Representación: `concat(estados[primera[i]], estados[ultima[j]], emb_ancho(j - i))` → `Linear(2H + dim_ancho, H) → GELU → Dropout → Linear(H, n_tipos + 1)`.
 
 - [ ] **Paso 1: Test**
 
@@ -304,14 +304,14 @@ def test_forward_formas():
     tramos = torch.tensor([[[0, 0], [0, 1], [1, 2], [2, 3]], [[0, 0], [0, 1], [0, 0], [0, 0]]])
     mascara = torch.tensor([[True, True, True, True], [True, True, False, False]])
     logits = cabeza(estados, primera, ultima, tramos, mascara)
-    assert logits.shape == (2, 4, 8) and NINGUNO == 7
+    assert logits.shape == (2, 4, 6) and NINGUNO == 5
     assert torch.isfinite(logits).all()
 ```
 
 - [ ] **Paso 2: Implementar `enrel/modelo/entidades.py`**
 
 ```python
-"""Cabeza de entidades: clasifica tramos de 1 a `max_ancho` palabras en 7 tipos más «ninguno»."""
+"""Cabeza de entidades: clasifica tramos de 1 a `max_ancho` palabras en 5 tipos más «ninguno»."""
 
 import torch
 from torch import nn
@@ -365,8 +365,8 @@ git commit -m "Añade la cabeza de entidades por clasificación de tramos"
 - Test: `tests/test_modelo_relaciones.py`
 
 **Interfaces:**
-- `N_CLASES = len(CLASES_FINAS)` (24); `TH = N_CLASES` (índice del logit umbral; la salida tiene `N_CLASES + 1` columnas).
-- `class CabezaRelaciones(nn.Module)`: `__init__(hidden: int, n_clases: int = 24, tam_grupo: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], mascara_tokens: BoolTensor [B, T], menciones: LongTensor [B, G, M] (índice de la primera subpalabra de cada mención de cada grupo, relleno 0), mascara_menciones: BoolTensor [B, G, M], pares: LongTensor [B, R, 2] (índices de grupo), mascara_pares: BoolTensor [B, R]) -> tuple[logits [B, R, n_clases + 1], logits_vigencia [B, R, 3]]`.
+- `N_CLASES = len(CLASES_FINAS)` (25); `TH = N_CLASES` (índice del logit umbral; la salida tiene `N_CLASES + 1` columnas).
+- `class CabezaRelaciones(nn.Module)`: `__init__(hidden: int, n_clases: int = 25, tam_grupo: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], mascara_tokens: BoolTensor [B, T], menciones: LongTensor [B, G, M] (índice de la primera subpalabra de cada mención de cada grupo, relleno 0), mascara_menciones: BoolTensor [B, G, M], pares: LongTensor [B, R, 2] (índices de grupo), mascara_pares: BoolTensor [B, R]) -> tuple[logits [B, R, n_clases + 1], logits_vigencia [B, R, 3]]`.
   - Representación de grupo `g[b, k] = logsumexp(estados[b, menciones[b, k, :]])` sobre las menciones válidas.
   - Contexto local del par: `q = W_q(concat(g_cabeza, g_cola))` `[B, R, H]`; `puntuaciones = (q @ estados^T) / sqrt(H)` `[B, R, T]` con máscara de tokens; `c = softmax(puntuaciones) @ estados`. Esta atención aprendida sustituye a la reutilización de la atención del codificador de ATLOP porque se exporta a ONNX sin depender de la implementación de atención del backbone. Guarda `self.ultima_atencion` (`[B, R, T]`, detach) para la evidencia en inferencia.
   - `z_c = tanh(W_c(concat(g_cabeza, c)))`, `z_t = tanh(W_t(concat(g_cola, c)))`, ambos de dimensión `H`; bilineal agrupado: se reordenan en `H / tam_grupo` grupos de `tam_grupo` y `logits = W_b(vec(z_c_k ⊗ z_t_k) para todo k)` con `W_b: Linear((H / tam_grupo) * tam_grupo * tam_grupo, n_clases + 1)`.
@@ -383,7 +383,7 @@ from enrel.modelo.relaciones import TH, CabezaRelaciones
 
 
 def test_forward_formas_y_atencion():
-    cabeza = CabezaRelaciones(hidden=64, n_clases=24, tam_grupo=16)
+    cabeza = CabezaRelaciones(hidden=64, n_clases=25, tam_grupo=16)
     estados = torch.randn(2, 12, 64)
     mascara_tokens = torch.ones(2, 12, dtype=torch.bool)
     mascara_tokens[1, 8:] = False
@@ -392,7 +392,7 @@ def test_forward_formas_y_atencion():
     pares = torch.tensor([[[0, 1], [1, 0], [0, 2]], [[0, 1], [0, 0], [0, 0]]])
     mascara_pares = torch.tensor([[True, True, True], [True, False, False]])
     logits, logits_vigencia = cabeza(estados, mascara_tokens, menciones, mascara_menciones, pares, mascara_pares)
-    assert logits.shape == (2, 3, 25) and TH == 24
+    assert logits.shape == (2, 3, 26) and TH == 25
     assert logits_vigencia.shape == (2, 3, 3)
     assert torch.isfinite(logits).all() and torch.isfinite(logits_vigencia).all()
     assert cabeza.ultima_atencion.shape == (2, 3, 12)
@@ -992,8 +992,8 @@ from enrel.entrenamiento.tensores import Ejemplo
 def ej(doc_id, n_tok, n_pal, tramos, grupos, pares, vigs=None):
     vigs = vigs if vigs is not None else [-100] * len(pares)
     return Ejemplo(doc_id, list(range(n_tok)), [1] * n_tok, list(range(1, n_pal + 1)), list(range(1, n_pal + 1)),
-                   tramos, [7] * len(tramos), grupos, ["persona"] * len(grupos), pares, [[0] * 24 for _ in pares],
-                   [[True] * 24 for _ in pares], vigs)
+                   tramos, [7] * len(tramos), grupos, ["persona"] * len(grupos), pares, [[0] * 25 for _ in pares],
+                   [[True] * 25 for _ in pares], vigs)
 
 
 def test_colar_rellena():
@@ -1005,7 +1005,7 @@ def test_colar_rellena():
     assert lote.etiquetas_tramos[1, 1] == -100
     assert lote.menciones.shape == (2, 2, 2) and lote.mascara_menciones[0].tolist() == [[True, True], [True, False]]
     assert lote.pares.shape == (2, 2, 2) and lote.mascara_pares.tolist() == [[True, True], [False, False]]
-    assert lote.etiquetas_pares.shape == (2, 2, 24)
+    assert lote.etiquetas_pares.shape == (2, 2, 25)
     assert lote.etiquetas_vigencia.shape == (2, 2) and lote.etiquetas_vigencia.tolist() == [[0, -100], [-100, -100]]
 
 
@@ -1924,7 +1924,7 @@ git commit -m "Cierra la etapa 2: primer modelo entrenado con plata y evaluado c
 
 ## Autorrevisión del plan de la etapa 2
 
-**Cobertura de la spec.** §4.1 backbone y respaldo → 2.2 (y 0.16). §4.2 cabeza de tramos hasta 16 palabras, anidamiento entre tipos, negativos 8:1 → 2.3, 2.7, 2.10. §4.3 agrupación por reglas con alias opcional → reutiliza 0.6 en 2.10. §4.4 cabeza de pares con logsumexp, contexto local, bilineal agrupado de 64, 24 clases más TH, cabeza de vigencia aparte, máscara de tipos, pérdida de umbral adaptativo con reponderación de cola larga, decodificación por TH, evidencia, tope de 60 grupos → 2.4, 2.5, 2.6, 2.7, 2.10. §4.5 salida JSON → `Documento` y `predecir-conjunto`; el exportador FtM va en la etapa 3. §7 receta (bf16, checkpointing, lote 2×8, 4.096, lr, épocas, paciencia, semillas, trazabilidad, cordura) → 2.9, 2.11, 2.12, 2.13. §8 tabla con tres filas e Ign-F1 → 2.13. §10 etapa 2 criterio de salida → 2.13.
+**Cobertura de la spec.** §4.1 backbone y respaldo → 2.2 (y 0.16). §4.2 cabeza de tramos hasta 16 palabras, anidamiento entre tipos, negativos 8:1 → 2.3, 2.7, 2.10. §4.3 agrupación por reglas con alias opcional → reutiliza 0.6 en 2.10. §4.4 cabeza de pares con logsumexp, contexto local, bilineal agrupado de 64, 25 clases más TH, cabeza de vigencia aparte, máscara de tipos, pérdida de umbral adaptativo con reponderación de cola larga, decodificación por TH, evidencia, tope de 60 grupos → 2.4, 2.5, 2.6, 2.7, 2.10. §4.5 salida JSON → `Documento` y `predecir-conjunto`; el exportador FtM va en la etapa 3. §7 receta (bf16, checkpointing, lote 2×8, 4.096, lr, épocas, paciencia, semillas, trazabilidad, cordura) → 2.9, 2.11, 2.12, 2.13. §8 tabla con tres filas e Ign-F1 → 2.13. §10 etapa 2 criterio de salida → 2.13.
 
 **Tipos y firmas.** `Codificacion` (2.1) con `palabras`, `primera_subpalabra`, `ultima_subpalabra`, `desplazamiento`, `texto` la usan 2.7 y 2.10. `Ejemplo` (2.7) y `Lote` (2.8) con los mismos campos los consume `ModeloEnrel.forward` (2.6) y `Pipeline` (2.10). `CabezaRelaciones.forward(estados, mascara_tokens, menciones, mascara_menciones, pares, mascara_pares)` (2.4) coincide con la llamada en 2.6 y 2.10. `decodificar_umbral(logits, mascara)` y `confianzas` (2.5) las usa 2.10. `mascara_tipos` (2.6) la usan 2.7 y 2.10. `Config` (2.9) la consume `entrenar` (2.11) y `cordura` (2.12).
 
