@@ -535,7 +535,9 @@ def _bloque_vigencia(fecha: str) -> str:
         f"VIGENCIA (relativa a la fecha del artículo, {fecha}; no a cuándo lees esto):\n"
         "- vigente (por defecto): el texto habla en presente o no marca fin.\n"
         "- pasada: con «ex», «fue», «entonces», «hasta», «exministro» y marcas similares de que ya terminó.\n"
-        "- futura: con lo anunciado («asumirá», «será») o lo aspirado («aspira a», «candidato», «precandidato»).\n"
+        "- futura: con lo anunciado («asumirá», «será»).\n"
+        "- No confundir con la modalidad de ocupa_cargo (titular/aspirante, en sus Atributos arriba): aspirar es una "
+        "modalidad, no un tiempo; un aspirante puede estarlo vigente (aspira hoy) o pasada (aspiró y ya no).\n"
         "- En nombro_a, sucedio_a, fundo, contrato_a y financia_a (son sucesos, no estados) casi siempre es vigente."
     )
 
@@ -1111,7 +1113,7 @@ from tests.test_eval_relaciones import ORO, pred
 
 
 def test_medir_pasa_y_no_pasa():
-    perfecto = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo"), Relacion("p1", "p2", "socio_de")])
+    perfecto = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo", "titular"), Relacion("p1", "p2", "socio_de")])
     m = medir([ORO], [perfecto])
     assert m["re_mas"] == 1.0 and m["direccion"] == 1.0 and m["entidades_estricto"] < 1.0  # falta Colombia en la predicción
     assert not m["pasa"]  # entidades 3/4 = 0.86 < 0.90
@@ -1361,7 +1363,7 @@ def predecir_documento(extractor, doc: Documento, umbral: float = 0.5, nombre: s
                      "linea-base-gliner", {"modelo": nombre, "umbral": umbral})
 ```
 
-Nota: GLiNER no predice atributos; se asigna el primer atributo de la relación (p. ej. `familiar_de:conyuge`) cuando la relación tiene atributos, y ninguno cuando no los tiene (ocupa_cargo, ya sin atributo). Tampoco predice vigencia: se queda en `vigente` por defecto, así que su tasa de vigencia informada es solo la proporción de casos donde el oro también es `vigente`. La evaluación fina penaliza el atributo por defecto que no coincide. Es la línea base; se documenta.
+Nota: GLiNER no predice atributos; se asigna el primer atributo de la relación cuando la relación tiene atributos (p. ej. `familiar_de` → `conyuge`, `ocupa_cargo` → `titular`), y ninguno cuando no los tiene. Tampoco predice vigencia: se queda en `vigente` por defecto, así que su tasa de vigencia informada es solo la proporción de casos donde el oro también es `vigente`. La evaluación fina penaliza el atributo por defecto que no coincide. Es la línea base; se documenta.
 
 `enrel/evaluacion/cli_linea_base.py`: subcomando `linea-base-gliner` que carga el oro, corre `predecir_documento` sobre cada documento, guarda y muestra el tiempo por documento (también es un dato de CPU si se corre con `taskset -c 0-3`).
 
