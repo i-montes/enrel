@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from enrel.esquema.tipos import SIN_TIPO, TIPOS, O, P, admite
+from enrel.esquema.tipos import SIN_TIPO, TIPOS, VIGENCIA_POR_DEFECTO, VIGENCIAS, O, P, admite
 
 _TIPOS_LEGAJO = {"ley": ("norma", False), "cargo*": ("cargo", True)}
 
@@ -20,17 +20,28 @@ class Mapeo:
     relacion: str
     atributo: str | None
     invertir: bool
+    vigencia: str = VIGENCIA_POR_DEFECTO
 
 
-_CUANDO = {"vigente": "actual", "pasada": "anterior", "futura": "aspirante"}
 _NADA = Mapeo(SIN_TIPO, None, False)
 
+# Predicados que ya llevan el tiempo en el nombre: su vigencia es fija y gana sobre `cuando`,
+# que en legajo trae la columna del mismo nombre pero aquí sería redundante o contradictorio.
+_VIGENCIA_FORZADA = {
+    "ocupó el cargo": "pasada",
+    "renunció a": "pasada",
+    "aspira al cargo": "futura",
+    "aspira a": "futura",
+}
+
 # Cada regla es (relacion, atributo, invertir) o una función (tipo_a, tipo_b, cuando) → esa tupla.
+# El atributo de ocupa_cargo desapareció: la distinción actual/anterior/aspirante vive ahora en
+# la vigencia (ver `_VIGENCIA_FORZADA` y la regla general en `mapear_predicado`).
 _REGLAS = {
     # viejos
-    "ocupa el cargo": lambda ta, tb, c: ("ocupa_cargo", _CUANDO.get(c, "actual"), False),
-    "aspira a": ("ocupa_cargo", "aspirante", False),
-    "renunció a": (lambda ta, tb, c: ("ocupa_cargo", "anterior", False) if tb == "cargo" else (SIN_TIPO, None, False)),
+    "ocupa el cargo": ("ocupa_cargo", None, False),
+    "aspira a": ("ocupa_cargo", None, False),
+    "renunció a": (lambda ta, tb, c: ("ocupa_cargo", None, False) if tb == "cargo" else (SIN_TIPO, None, False)),
     "nombró a": ("nombro_a", None, False),
     "sucedió a": ("sucedio_a", None, False),
     "trabaja en": ("trabaja_en", None, False),
@@ -80,8 +91,8 @@ _REGLAS = {
     "sanciona con": (SIN_TIPO, None, False),
     "demandó a": (SIN_TIPO, None, False),
     # nuevos (los homónimos ya están arriba)
-    "ocupó el cargo": ("ocupa_cargo", "anterior", False),
-    "aspira al cargo": ("ocupa_cargo", "aspirante", False),
+    "ocupó el cargo": ("ocupa_cargo", None, False),
+    "aspira al cargo": ("ocupa_cargo", None, False),
     "propietario de": ("propietario_de", None, False),
     "apoya a": ("apoya_a", None, False),
     "se opone a": ("se_opone_a", None, False),
@@ -162,12 +173,17 @@ assert PREDICADOS_VIEJOS | PREDICADOS_NUEVOS == set(_REGLAS)
 
 
 def mapear_predicado(predicado: str, tipo_a: str, tipo_b: str, cuando: str = "vigente") -> Mapeo:
-    """Traduce un predicado de legajo, con los tipos de enrel de sus extremos. Lo que no encaja va a SIN_TIPO."""
+    """Traduce un predicado de legajo, con los tipos de enrel de sus extremos. Lo que no encaja va a SIN_TIPO.
+
+    La vigencia es, en general, `cuando` (si no es una de VIGENCIAS, se usa la por defecto);
+    los predicados de `_VIGENCIA_FORZADA` ya llevan el tiempo en el nombre y ganan sobre `cuando`.
+    """
     regla = _REGLAS.get(predicado)
     if regla is None:
         raise ValueError(f"predicado de legajo desconocido: {predicado!r}")
     relacion, atributo, invertir = regla(tipo_a, tipo_b, cuando) if callable(regla) else regla
+    vigencia = _VIGENCIA_FORZADA.get(predicado) or (cuando if cuando in VIGENCIAS else VIGENCIA_POR_DEFECTO)
     ta, tb = (tipo_b, tipo_a) if invertir else (tipo_a, tipo_b)
     if relacion != SIN_TIPO and not admite(relacion, ta, tb):
         return _NADA
-    return Mapeo(relacion, atributo, invertir)
+    return Mapeo(relacion, atributo, invertir, vigencia)

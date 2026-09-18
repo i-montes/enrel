@@ -25,7 +25,7 @@ def _r(nombre, desde, hasta, simetrica=False, atributos=(), familia=""):
 
 
 _LISTA = [
-    _r("ocupa_cargo", [P], [C], atributos=("actual", "anterior", "aspirante"), familia="A"),
+    _r("ocupa_cargo", [P], [C], familia="A"),
     _r("nombro_a", [P, O], [P], familia="A"),
     _r("sucedio_a", [P], [P], familia="A"),
     _r("trabaja_en", [P], [O], familia="A"),
@@ -53,6 +53,21 @@ FAMILIAS: dict[str, tuple[str, ...]] = {
     fam: tuple(d.nombre for d in _LISTA if d.familia == fam) for fam in ("A", "B", "C")
 }
 
+# La vigencia temporal es un eje propio de toda relación (no solo de ocupa_cargo): cuándo
+# afirma el texto que el vínculo se sostiene. «vigente» por defecto porque la mayoría de las
+# relaciones anotadas lo son y los ficheros ya escritos, sin este campo, deben leerse así.
+VIGENCIAS: tuple[str, ...] = ("vigente", "pasada", "futura")
+VIGENCIA_POR_DEFECTO = "vigente"
+
+# Relaciones que describen un suceso puntual, no un estado que se sostiene en el tiempo: la
+# vigencia rara vez aplica («nombró a» no está ni «vigente» ni «pasado» ejerciéndose, ocurrió
+# una vez). Es informativa para la guía y el prompt del maestro; no restringe el esquema.
+_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a"})
+
+
+def es_suceso(relacion: str) -> bool:
+    return relacion in _SUCESOS
+
 
 def clase_fina(relacion: str, atributo: str | None) -> str:
     """«relacion:atributo» si la relación tiene atributos; «relacion» si no."""
@@ -71,7 +86,7 @@ def desglosar(clase: str) -> tuple[str, str | None]:
 CLASES_FINAS: tuple[str, ...] = tuple(clase_fina(d.nombre, a) for d in _LISTA for a in (d.atributos or (None,))) + (
     SIN_TIPO,
 )
-assert len(CLASES_FINAS) == 25
+assert len(CLASES_FINAS) == 23
 INDICE_CLASE: dict[str, int] = {c: i for i, c in enumerate(CLASES_FINAS)}
 
 

@@ -6,16 +6,17 @@ def test_tipos_y_constantes():
     assert (t.P, t.O, t.L, t.C, t.N, t.B, t.M) == t.TIPOS
 
 
-def test_hay_17_relaciones_y_25_clases_finas():
+def test_hay_17_relaciones_y_23_clases_finas():
     assert len(t.RELACIONES) == 17
     assert t.SIN_TIPO not in t.RELACIONES
-    assert len(t.CLASES_FINAS) == 25
+    assert len(t.CLASES_FINAS) == 23
     assert t.CLASES_FINAS[-1] == t.SIN_TIPO
-    assert t.INDICE_CLASE[t.SIN_TIPO] == 24
+    assert t.INDICE_CLASE[t.SIN_TIPO] == 22
 
 
 def test_clase_fina_y_desglosar():
-    assert t.clase_fina("ocupa_cargo", "actual") == "ocupa_cargo:actual"
+    assert t.clase_fina("ocupa_cargo", None) == "ocupa_cargo"
+    assert t.clase_fina("familiar_de", "hijo_de") == "familiar_de:hijo_de"
     assert t.clase_fina("dirige", None) == "dirige"
     assert t.desglosar("familiar_de:hijo_de") == ("familiar_de", "hijo_de")
     assert t.desglosar("trabaja_en") == ("trabaja_en", None)
@@ -23,10 +24,28 @@ def test_clase_fina_y_desglosar():
 
 
 def test_atributos():
-    assert t.RELACIONES["ocupa_cargo"].atributos == ("actual", "anterior", "aspirante")
+    # La vigencia (actual/anterior/aspirante) dejó de ser un atributo de ocupa_cargo: ahora
+    # es el eje `vigencia`, propio de toda relación (véase test_datos_documento.py).
+    assert t.RELACIONES["ocupa_cargo"].atributos == ()
     assert t.RELACIONES["familiar_de"].atributos == ("conyuge", "hijo_de", "hermano", "otro")
     assert t.RELACIONES["investigado_por"].atributos == ("investigado", "acusado", "condenado")
     assert t.RELACIONES["trabaja_en"].atributos == ()
+
+
+def test_vigencias_y_defecto():
+    assert t.VIGENCIAS == ("vigente", "pasada", "futura")
+    assert t.VIGENCIA_POR_DEFECTO == "vigente"
+
+
+def test_es_suceso():
+    assert t.es_suceso("nombro_a")
+    assert t.es_suceso("sucedio_a")
+    assert t.es_suceso("fundo")
+    assert t.es_suceso("contrato_a")
+    assert t.es_suceso("financia_a")
+    assert not t.es_suceso("ocupa_cargo")
+    assert not t.es_suceso("dirige")
+    assert not t.es_suceso(t.SIN_TIPO)
 
 
 def test_admite():

@@ -2,7 +2,7 @@
 
 from enrel.datos.documento import Documento
 from enrel.datos.normalizar import nfc
-from enrel.esquema.tipos import RELACIONES_Y_SIN_TIPO, TIPOS, admite, clase_fina, es_simetrica
+from enrel.esquema.tipos import RELACIONES_Y_SIN_TIPO, TIPOS, VIGENCIAS, admite, clase_fina, es_simetrica
 
 
 def validar_documento(doc: Documento) -> list[str]:
@@ -40,6 +40,8 @@ def validar_documento(doc: Documento) -> list[str]:
         except ValueError as e:
             errores.append(f"{doc.doc_id}: {e}")
             continue
+        if r.vigencia not in VIGENCIAS:
+            errores.append(f"{doc.doc_id}: vigencia desconocida {r.vigencia!r} en {fina}")
         if r.cabeza == r.cola:
             errores.append(f"{doc.doc_id}: autorrelación {fina} sobre {r.cabeza}")
             continue

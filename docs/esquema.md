@@ -18,7 +18,7 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 
 | Relación | De → a | Simétrica | Atributos | Familia | FollowTheMoney | Wikidata |
 |---|---|---|---|---|---|---|
-| ocupa_cargo | persona → cargo | no | actual, anterior, aspirante | A | Occupancy | P39 |
+| ocupa_cargo | persona → cargo | no | — | A | Occupancy | P39 |
 | nombro_a | organizacion, persona → persona | no | — | A | — | P748 |
 | sucedio_a | persona → persona | no | — | A | Succession | P1365 |
 | trabaja_en | persona → organizacion | no | — | A | Employment | P108 |
@@ -49,8 +49,8 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | apoya a | nuevo | apoya_a | apoya_a | apoya_a | apoya_a |
 | apoyó a | viejo | apoya_a | apoya_a | apoya_a | apoya_a |
 | asesor de | viejo | vinculo_sin_tipo | trabaja_en | vinculo_sin_tipo | vinculo_sin_tipo |
-| aspira a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:aspirante | vinculo_sin_tipo |
-| aspira al cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:aspirante | vinculo_sin_tipo |
+| aspira a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
+| aspira al cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
 | autor de | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | citado en | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | condenado por | viejo y nuevo | vinculo_sin_tipo | investigado_por:condenado | vinculo_sin_tipo | investigado_por:condenado |
@@ -71,13 +71,13 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | investigado por | viejo y nuevo | vinculo_sin_tipo | investigado_por:investigado | vinculo_sin_tipo | investigado_por:investigado |
 | miembro de | viejo y nuevo | vinculo_sin_tipo | miembro_de | vinculo_sin_tipo | vinculo_sin_tipo |
 | nombró a | viejo y nuevo | nombro_a | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
-| ocupa el cargo | viejo y nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:actual | vinculo_sin_tipo |
-| ocupó el cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:anterior | vinculo_sin_tipo |
+| ocupa el cargo | viejo y nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
+| ocupó el cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
 | opositor de | viejo | se_opone_a | se_opone_a | vinculo_sin_tipo | se_opone_a |
 | padre o madre de | viejo | familiar_de:hijo_de (invertida) | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | parte de | viejo y nuevo | vinculo_sin_tipo | miembro_de | vinculo_sin_tipo | parte_de |
 | propietario de | nuevo | vinculo_sin_tipo | propietario_de | vinculo_sin_tipo | propietario_de |
-| renunció a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:anterior | vinculo_sin_tipo |
+| renunció a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
 | sanciona con | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | se opone a | nuevo | se_opone_a | se_opone_a | vinculo_sin_tipo | se_opone_a |
 | se reunió con | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |

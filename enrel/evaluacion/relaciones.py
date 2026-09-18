@@ -7,6 +7,14 @@ para que un maestro que vuelque en la reserva lo que no sabe clasificar pague su
 positivos igual que cualquier otra clase. `__micro_sin_reserva__` la excluye, para poder
 comparar. `__macro__` sigue excluyéndola siempre: una media de F1 por clase no debe dejarse
 dominar por una clase que por definición no tiene un límite claro de qué admite.
+
+La vigencia (vigente/pasada/futura) es, como la dirección, un eje ortogonal a RE y RE+: no
+entra en la condición de acierto de ninguna relación, gruesa o fina. Mezclarla haría el F1 de
+relaciones ilegible (una relación con la dirección o la vigencia correctas pero cambiadas de
+sitio no es lo mismo que no haberla encontrado). Se reporta aparte, en `__vigencia__`: de las
+relaciones que ya acertaron en par y etiqueta, cuántas también acertaron la vigencia (tp) y
+cuántas no (fn); no tiene fp propio, así que su cifra publicable es la tasa `r` = aciertos de
+vigencia entre las relaciones acertadas, igual que `__direccion__`.
 """
 
 from enrel.datos.documento import Documento, Relacion
@@ -52,6 +60,7 @@ def evaluar_relaciones(
     ignorar = ignorar or set()
     por_etiqueta: dict[str, PRF] = {}
     direccion = PRF()
+    vigencia = PRF()
 
     def prf(etiqueta: str) -> PRF:
         return por_etiqueta.setdefault(etiqueta, PRF())
@@ -92,6 +101,10 @@ def evaluar_relaciones(
                 prf(et).tp += 1
                 if not simetrica:
                     direccion.tp += 1
+                if libres[acierto].vigencia == ro.vigencia:
+                    vigencia.tp += 1
+                else:
+                    vigencia.fn += 1
             else:
                 prf(et).fn += 1
                 if invertida is not None:
@@ -117,4 +130,5 @@ def evaluar_relaciones(
     por_etiqueta["__micro_sin_reserva__"] = micro_sin_reserva
     por_etiqueta["__macro__"] = _Macro(sum(f1s) / len(f1s) if f1s else 0.0)
     por_etiqueta["__direccion__"] = direccion
+    por_etiqueta["__vigencia__"] = vigencia
     return por_etiqueta

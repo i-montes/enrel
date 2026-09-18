@@ -52,11 +52,15 @@ def test_oro_json_offsets_y_todas_las_apariciones():
 def test_oro_json_mapeo_e_inversion():
     d = dl.documento_desde_oro_json(SPEC, ART)
     finas = {(d.grupo_de(r.cabeza).canonico, d.clase_fina_de(r), d.grupo_de(r.cola).canonico) for r in d.relaciones}
-    assert ("Álvaro Uribe", "ocupa_cargo:anterior", "presidente de Colombia") in finas
+    # ocupa_cargo ya no tiene atributo: la clase fina es «ocupa_cargo» sin importar la vigencia.
+    assert ("Álvaro Uribe", "ocupa_cargo", "presidente de Colombia") in finas
     assert ("Tomás Uribe", "familiar_de:hijo_de", "Álvaro Uribe") in finas  # invertida
     assert ("Álvaro Uribe", "fundo", "Centro Democrático") in finas
     assert len(d.relaciones) == 3
     assert d.origen["predicados_originales"]["padre o madre de"] == 1
+    ocupa = next(r for r in d.relaciones if r.relacion == "ocupa_cargo")
+    assert ocupa.vigencia == "pasada"  # SPEC lo anota «pasada» («ocupa el cargo», cuando="pasada")
+    assert d.origen["vigencias"] == {"pasada": 1, "vigente": 2}
 
 
 def test_plata_legajo():

@@ -20,7 +20,10 @@ def doc_ejemplo() -> Documento:
         Grupo("e3", "cargo", "ministro de Comercio"),
         Grupo("e4", "organizacion", "Comercio"),
     ]
-    r = [Relacion("e1", "e2", "nombro_a"), Relacion("e2", "e3", "ocupa_cargo", "actual", (15, 96))]
+    r = [
+        Relacion("e1", "e2", "nombro_a"),
+        Relacion("e2", "e3", "ocupa_cargo", vigencia="pasada", evidencia=(15, 96)),
+    ]
     return Documento(
         "wp:1",
         texto,
@@ -46,7 +49,9 @@ def test_documento_valido_y_offsets():
         assert d.texto[m.ini : m.fin] == m.texto
     assert validar_documento(d) == []
     assert [m.id for m in d.menciones_de("e1")] == ["m1", "m2"]
-    assert d.clase_fina_de(d.relaciones[1]) == "ocupa_cargo:actual"
+    assert d.clase_fina_de(d.relaciones[1]) == "ocupa_cargo"  # ocupa_cargo ya no tiene atributos
+    assert d.relaciones[0].vigencia == "vigente"  # por defecto
+    assert d.relaciones[1].vigencia == "pasada"
 
 
 def test_ida_y_vuelta_jsonl(tmp_path: Path):
@@ -56,19 +61,37 @@ def test_ida_y_vuelta_jsonl(tmp_path: Path):
     [d2] = cargar_jsonl(ruta)
     assert d2 == d
     assert d2.relaciones[1].evidencia == (15, 96)
+    assert d2.relaciones[1].vigencia == "pasada"
+
+
+def test_desde_dict_sin_vigencia_es_compatible():
+    # Ficheros escritos antes de que `vigencia` existiera no traen la clave: deben leerse
+    # como «vigente», no romper.
+    d = doc_ejemplo()
+    bruto = d.a_dict()
+    for r in bruto["relaciones"]:
+        del r["vigencia"]
+    d2 = Documento.desde_dict(bruto)
+    assert all(r.vigencia == "vigente" for r in d2.relaciones)
 
 
 def test_validar_detecta_errores():
     d = doc_ejemplo()
     d.menciones[0].fin = 12
     d.relaciones.append(Relacion("e1", "e1", "socio_de"))
-    d.relaciones.append(Relacion("e1", "e4", "ocupa_cargo", "actual"))
+    d.relaciones.append(Relacion("e1", "e4", "ocupa_cargo"))
     d.relaciones.append(Relacion("e1", "e2", "nombro_a"))
     errores = validar_documento(d)
     assert any("m1" in e and "texto" in e for e in errores)
     assert any("autorrelación" in e for e in errores)
     assert any("no admite" in e for e in errores)
     assert any("duplicada" in e for e in errores)
+
+
+def test_validar_vigencia_desconocida():
+    d = doc_ejemplo()
+    d.relaciones.append(Relacion("e1", "e4", "trabaja_en", vigencia="algun-dia"))
+    assert any("vigencia desconocida" in e for e in validar_documento(d))
 
 
 def test_validar_simetrica_espejo():

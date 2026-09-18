@@ -49,7 +49,6 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 
 ### ocupa_cargo
 **Definición:** Una persona ejerce, ejerció o busca un cargo. La cabeza es la persona; la cola es el cargo. Es la relación central del grafo de poder y la más frecuente. Si el texto da el cargo, se usa esta relación y no trabaja_en ni dirige.
-**Atributos:** actual: lo ejerce según el texto, en presente o sin marca de fin («el ministro de Hacienda, José Manuel Restrepo»); anterior: lo ejerció y ya no, con «ex», «fue», «entonces», «hasta», «renunció» («el exministro Restrepo», «fue alcalde de Bogotá»); aspirante: se postula o busca el cargo, con «candidato», «precandidato», «aspira», «suena para» («Char aspira a la Presidencia»).
 **Ejemplos:**
 - «El ministro de Hacienda, José Manuel Restrepo, anunció…» → Restrepo ocupa_cargo:actual «ministro de Hacienda».
 - «El exalcalde de Medellín Daniel Quintero» → Quintero ocupa_cargo:anterior «exalcalde de Medellín».

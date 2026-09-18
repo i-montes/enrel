@@ -145,9 +145,10 @@ class _Constructor:
             if clave in claves or (es_simetrica(mp.relacion, mp.atributo) and espejo in claves):
                 continue
             claves.add(clave)
-            relaciones.append(Relacion(cabeza.grupo, cola.grupo, mp.relacion, mp.atributo, ev))
+            relaciones.append(Relacion(cabeza.grupo, cola.grupo, mp.relacion, mp.atributo, mp.vigencia, ev))
         self.origen["designa"] = self.designa
         self.origen["predicados_originales"] = dict(self.origen["predicados_originales"])
+        self.origen["vigencias"] = dict(Counter(r.vigencia for r in relaciones))
         doc = Documento(
             doc_id=f"wp:{self.art.wp_id}",
             texto=self.art.texto,

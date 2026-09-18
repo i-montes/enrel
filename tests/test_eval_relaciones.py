@@ -21,7 +21,11 @@ ORO = doc(
         Grupo("g3", "cargo", "ministro de Comercio"),
         Grupo("g4", "lugar", "Colombia"),
     ],
-    [Relacion("g1", "g2", "nombro_a"), Relacion("g2", "g3", "ocupa_cargo", "actual"), Relacion("g1", "g2", "socio_de")],
+    [
+        Relacion("g1", "g2", "nombro_a"),
+        Relacion("g2", "g3", "ocupa_cargo", vigencia="vigente"),
+        Relacion("g1", "g2", "socio_de"),
+    ],
 )
 
 
@@ -39,15 +43,35 @@ def test_acierto_direccion_y_simetrica():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo", "anterior"),
+            Relacion("p2", "p3", "ocupa_cargo", vigencia="pasada"),
             Relacion("p2", "p1", "socio_de"),
         ]
     )
     r = evaluar_relaciones([ORO], [p], "gruesa")
     assert (r["__micro__"].tp, r["__micro__"].fp, r["__micro__"].fn) == (3, 0, 0)
     fina = evaluar_relaciones([ORO], [p], "fina")
-    assert fina["ocupa_cargo:actual"].fn == 1 and fina["ocupa_cargo:anterior"].fp == 1
-    assert fina["__micro__"].tp == 2
+    # ocupa_cargo ya no tiene atributo: una vigencia distinta (aquí, «pasada» contra «vigente»
+    # en el oro) no crea clases finas cruzadas ni cuenta como error de RE+ fina.
+    assert fina["ocupa_cargo"].tp == 1
+    assert "ocupa_cargo:actual" not in fina and "ocupa_cargo:anterior" not in fina
+    assert fina["__micro__"].tp == 3
+
+
+def test_vigencia_es_eje_aparte_de_re():
+    # Mismo caso que arriba: la vigencia no entra en la condición de acierto de RE/RE+/fina,
+    # pero se reporta aparte en __vigencia__. De las 3 relaciones acertadas en par y etiqueta,
+    # 2 aciertan también la vigencia (nombro_a y socio_de, «vigente» por defecto en ambos
+    # lados) y 1 no (ocupa_cargo: «vigente» en el oro, «pasada» en la predicción).
+    p = pred(
+        [
+            Relacion("p1", "p2", "nombro_a"),
+            Relacion("p2", "p3", "ocupa_cargo", vigencia="pasada"),
+            Relacion("p2", "p1", "socio_de"),
+        ]
+    )
+    r = evaluar_relaciones([ORO], [p], "gruesa")
+    assert (r["__vigencia__"].tp, r["__vigencia__"].fn, r["__vigencia__"].fp) == (2, 1, 0)
+    assert r["__vigencia__"].r == 2 / 3
 
 
 def test_direccion_invertida_cuenta_como_error_y_en_direccion():
@@ -101,7 +125,7 @@ def test_macro_excluye_sin_tipo_pero_micro_lo_incluye():
 
 def test_ign():
     ignorar = tripletas_canonicas([ORO], "gruesa") - {("gustavo petro", "nombro_a", "luis carlos reyes")}
-    p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo", "actual")])
+    p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo")])
     r = evaluar_relaciones([ORO], [p], "gruesa", ignorar=ignorar)
     assert (r["__micro__"].tp, r["__micro__"].fp, r["__micro__"].fn) == (1, 0, 0)
 
