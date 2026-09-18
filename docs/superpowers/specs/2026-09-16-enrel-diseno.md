@@ -107,7 +107,7 @@ Puertas por relación: una relación se publica en el modelo cuando cumple dos c
 
 ### 3.3 Mapeo desde los 35 predicados de legajo
 
-Se aplica automáticamente al oro y a la plata existentes (`enrel/esquema/mapeo_legajo.py`). El oro de legajo trae 125 artículos con 5.509 menciones y 1.548 relaciones; el tipo `cargo*` (180 marcas, la designación sin nombre de legajo, «el Gobernador de Antioquia») se mapea a `cargo`. Reglas: los predicados con destino único se traducen directo; «parte de» se reparte por tipos de extremo (persona→org a miembro_de, org→org a parte_de, otros a vinculo_sin_tipo); «socio de» se reparte por tipos; «hijo de» conserva dirección y «padre o madre de» se invierte a hijo_de; «asesor de» persona→persona va a vinculo_sin_tipo; «impulsa» (predicado 26) se traduce directo a impulsa_norma, y «autor de» hace lo mismo cuando el destino es una norma (en los demás casos, con el tipo obra retirado del esquema, ya no tiene destino y se descarta); «citado en», «destinado a», «sanciona con», «se reunió con», «demandó a» van a vinculo_sin_tipo. El mapeo se registra por relación para poder auditar qué vino de dónde.
+Se aplica automáticamente al oro y a la plata existentes (`enrel/esquema/mapeo_legajo.py`). El oro de legajo (`datos/anotado/legajo-oro.jsonl`, hoy) trae 125 artículos con 5.593 menciones y 1.367 relaciones; el tipo `cargo*` (180 marcas, la designación sin nombre de legajo, «el Gobernador de Antioquia») se mapea a `cargo`. Reglas: los predicados con destino único se traducen directo; «parte de» se reparte por tipos de extremo (persona→org a miembro_de, org→org a parte_de, otros a vinculo_sin_tipo); «socio de» se reparte por tipos; «hijo de» conserva dirección y «padre o madre de» se invierte a hijo_de; «asesor de» persona→persona va a vinculo_sin_tipo; «impulsa» (predicado 26) se traduce directo a impulsa_norma, y «autor de» hace lo mismo cuando el destino es una norma (en los demás casos, con el tipo obra retirado del esquema, ya no tiene destino y se descarta); «citado en», «destinado a», «sanciona con», «se reunió con», «demandó a» van a vinculo_sin_tipo. El mapeo se registra por relación para poder auditar qué vino de dónde.
 
 ## 4. Arquitectura del modelo
 
@@ -230,7 +230,7 @@ Filtros a la salida, en orden, con contadores por corrida:
 4. Rechazo de la verificación.
 5. Reglas de legajo que siguen valiendo: un pronombre no es persona; una etiqueta de hablante al inicio de párrafo no es mención.
 
-**La puerta.** Antes de anotar los 3.500, el maestro corre sobre los 50 de prueba ya corregidos por el usuario. Criterio para seguir: entidades F1 estricto ≥ 0,90; relaciones RE+ (extremos por solape, relación gruesa correcta) ≥ 0,75; dirección correcta ≥ 0,95 en las asimétricas. Si no se cumple, se revisan los 30 errores más frecuentes, se ajustan definiciones y ejemplos, y se repite. Tres iteraciones como máximo antes de decidir si se retira alguna relación del esquema o se suma un segundo maestro. La tabla de cada iteración se guarda en `docs/maestro/puerta-<fecha>.md`.
+**La puerta.** Antes de anotar los 3.500, el maestro corre sobre los 50 de prueba ya corregidos por el usuario. Criterio para seguir: entidades F1 estricto ≥ 0,91; relaciones RE+ (extremos por solape, relación gruesa correcta) ≥ 0,75; dirección correcta ≥ 0,95 en las asimétricas. El umbral de entidades subió de 0,90 a 0,91 el 2026-09-17 para compensar el paso de 7 a 5 tipos de entidad (`persona, organizacion, lugar, cargo, norma`): sobre los mismos 50 documentos y el mismo maestro, el F1 estricto de entidades del techo de legajo pasó de 0,75 a 0,76 solo por ese cambio de esquema (`docs/resultados/etapa-0-legajo.md`), así que mantener 0,90 habría relajado la puerta sin decirlo; RE+ y dirección no se tocan porque su denominador (par y tipo de relación, o solo dirección) no cambia de la misma forma con menos tipos de entidad. Si no se cumple, se revisan los 30 errores más frecuentes, se ajustan definiciones y ejemplos, y se repite. Tres iteraciones como máximo antes de decidir si se retira alguna relación del esquema o se suma un segundo maestro. La tabla de cada iteración se guarda en `docs/maestro/puerta-<fecha>.md`.
 
 Costo estimado: 3.500 artículos × 5 llamadas × unos 3 segundos con 4 hilos concurrentes, alrededor de 4 a 6 horas de pared, más la cuota de tokens: unos 2.500 tokens de entrada por llamada, del orden de 45 millones de tokens de entrada en total.
 
@@ -323,7 +323,7 @@ Relaciones:
 - Ign-F1: se excluyen las tripletas (canónico cabeza, relación, canónico cola) que aparecen en entrenamiento.
 - Dirección: porcentaje de asimétricas con dirección correcta entre las que aciertan par y relación.
 - Vigencia: eje aparte; no entra en el acierto de RE ni de RE+ para no mezclar un eje ortogonal con el F1 de relaciones. Se publica como una fila «vigencia (tasa = R)» con solo `n` y la tasa de acierto `R`, sobre las relaciones donde el modelo ya acertó par y relación gruesa. En las relaciones que son sucesos (`es_suceso`: nombro_a, sucedio_a, fundo, contrato_a, financia_a) la vigencia normalmente vale vigente y se reporta aparte.
-- Por relación solo se publica F1 cuando la prueba tiene al menos 10 casos de esa relación; por debajo se reporta el conteo y «insuficiente». El oro de legajo mapeado a la prueba tiene 579 relaciones, de las que 264 son ocupa_cargo y varias relaciones quedan con menos de 10 (familiar_de ~19 en total, financia_a 1, contrato_a 3, fundo 2, sucedio_a 6, nombro_a 7); de ahí el conjunto prueba-dirigida opcional.
+- Por relación solo se publica F1 cuando la prueba tiene al menos 10 casos de esa relación; por debajo se reporta el conteo y «insuficiente». El oro de legajo mapeado a la prueba (`datos/anotado/legajo-oro.jsonl` filtrado a los 50 `doc_id` de `datos/conjuntos/prueba.jsonl`) tiene 523 relaciones, de las que 245 son ocupa_cargo y varias relaciones quedan con menos de 10 (familiar_de 19 en total, financia_a 1, contrato_a 3, fundo 2, sucedio_a 6, nombro_a 7); de ahí el conjunto prueba-dirigida opcional.
 
 Siempre:
 - Intervalos de confianza al 95 % por bootstrap sobre documentos.
@@ -335,7 +335,7 @@ Metas de la v0.1 sobre la prueba, con la línea base y el techo al lado:
 
 | Métrica | Meta | Referencia |
 |---|---|---|
-| Entidades F1 estricto | ≥ 0,88 | legajo 0,86 a 0,88 con solape |
+| Entidades F1 estricto | ≥ 0,88 | legajo 0,76 a 0,79 con solape |
 | Relaciones RE+ gruesa micro-F1 | ≥ 0,60 | legajo 0,47 a 0,52; techo del maestro debe ser ≥ 0,75 |
 | Relaciones macro-F1 gruesa | ≥ 0,50 | — |
 | Dirección correcta | ≥ 0,95 | legajo 0,97 |
@@ -387,7 +387,7 @@ CLI mínima: `enrel extraer articulo.txt --salida json|ftm`, `enrel evaluar --pr
 | Etapa | Entregables | Criterio de salida | Horas del usuario |
 |---|---|---|---|
 | 0 · Cimientos | Esquema y guía escritos; `mapeo_legajo.py` y `desde_legajo.py` con prueba de ida y vuelta sobre los 125 de oro y los 40 perfiles; evaluador funcionando sobre ese oro (maestro viejo de legajo contra oro, como primera tabla real); corpus congelado y muestra fijada; entorno CUDA; humo del backbone: carga, pasada de 4.096 tokens en la 4060 con lote 2 bf16, exportación a ONNX, tiempo en CPU a 4 hilos de una pasada de 1.500 tokens | El backbone pasa el humo o se elige el respaldo; la muestra está fijada con semilla; la guía tiene las 18 definiciones con ejemplos; el evaluador produce una tabla sobre los 40 perfiles | 8 h anotando los 40 perfiles, en paralelo |
-| 1 · Maestro y prueba | Cliente y prompts; los 50 de prueba corregidos por el usuario en legajo; puerta medida sobre prueba y prueba-dirigida | Puerta pasada: entidades ≥ 0,90, RE+ ≥ 0,75, dirección ≥ 0,95; o decisión documentada de retirar relaciones o sumar maestro | 8 h |
+| 1 · Maestro y prueba | Cliente y prompts; los 50 de prueba corregidos por el usuario en legajo; puerta medida sobre prueba y prueba-dirigida | Puerta pasada: entidades ≥ 0,91, RE+ ≥ 0,75, dirección ≥ 0,95; o decisión documentada de retirar relaciones o sumar maestro | 8 h |
 | 2 · Plata y primer modelo | Plata de 3.500; código de modelo y entrenamiento; cordura de sobreajuste; etapa 1 entrenada con dos semillas; evaluación completa con línea base y techo; los 10 de desarrollo de silla-nacional corregidos | Tabla completa en `docs/resultados/etapa-2.md`; el modelo supera a la línea base zero-shot en RE+ | 2 h |
 | 3 · Oro y cierre | Oro de entrenamiento; etapa 2; barrido con un backbone alternativo; ONNX y cuantización medidas; revisión de 50 falsos positivos; ficha; publicación v0.1 | Cifras publicadas con intervalos; rendimiento en CPU dentro de meta; repo y pesos públicos | 4 a 10 h |
 
