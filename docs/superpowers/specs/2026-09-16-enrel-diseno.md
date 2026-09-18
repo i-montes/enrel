@@ -73,8 +73,8 @@ Diecisiete relaciones tipadas más una de reserva. Cada una tiene dominio y rang
 | contrato_a | organizacion, persona → organizacion, persona | no | — | contrató a | ContractAward |
 | investigado_por | persona, organizacion → organizacion | no | etapa: investigado, acusado, condenado | investigado por, acusado de, condenado por | CourtCaseParty / P1399 |
 | ubicado_en | persona, organizacion, lugar → lugar | no | — | ubicado en | — / P159, P551, P131 |
-| apoya_a | persona, organizacion → persona, organizacion, cargo | no | — | apoyó a, aliado de | — |
-| se_opone_a | persona, organizacion → persona, organizacion | no | — | opositor de, criticó a | — |
+| apoya_a | persona, organizacion → persona, organizacion, cargo, norma | no | — | apoyó a, aliado de | — |
+| se_opone_a | persona, organizacion → persona, organizacion, norma | no | — | opositor de, criticó a | — |
 | vinculo_sin_tipo | cualquiera ↔ cualquiera | sí | — | se reunió con, demandó a, y lo que no encaja | UnknownLink |
 
 Todas las relaciones llevan además un campo `vigencia`, eje propio y no un atributo más: `vigente`, `pasada` o `futura`, por defecto `vigente`, siempre relativo a la fecha del artículo (la fecha dice cuándo se afirmó algo, no cuándo fue verdad). `futura` cubre tanto lo anunciado («asumirá», «será») como lo aspirado («aspira a la Presidencia»), que es como ya lo trataba el vocabulario de legajo. Por eso ocupa_cargo pierde los atributos de la tabla anterior (actual, anterior, aspirante): eran exactamente este eje, ahora expresado una sola vez para las 17 relaciones en lugar de repetido solo en una. En las relaciones que son sucesos y no estados —`nombro_a`, `sucedio_a`, `fundo`, `contrato_a`, `financia_a`, señaladas por `es_suceso(relacion)`— la vigencia rara vez aplica y normalmente se queda en `vigente`.
@@ -88,6 +88,7 @@ Reglas de desambiguación que van a la guía y al prompt:
 - parte_de solo entre organizaciones («la Facultad es parte de la Universidad», «filial de»). Una persona nunca es parte_de.
 - ubicado_en solo para sede o residencia afirmada, o contención geográfica (municipio en departamento). El origen («el caleño X», «de Popayán») y el lugar de los hechos no cuentan.
 - apoya_a y se_opone_a exigen una afirmación explícita de respaldo u oposición, no coocurrencia ni inferencia.
+- La autoría de una norma se anota como apoya_a: quien radica un proyecto o una ley la apoya. «Radicó el proyecto», «impulsó la reforma», «votó a favor» son apoya_a con destino norma; «votó en contra», «criticó la ley», «hundió el proyecto» son se_opone_a con destino norma.
 - Solo se marca lo que el texto afirma. «Habría», «se dice que», «según fuentes» sin afirmación: no se marca.
 - Las simétricas se anotan una sola vez; el exportador las duplica si el entrenamiento lo requiere.
 - hijo_de se anota con la cabeza en el hijo; padre o madre se deriva. Nunca se anotan las dos direcciones.
@@ -95,6 +96,13 @@ Reglas de desambiguación que van a la guía y al prompt:
 Clases finas del clasificador: las 17 relaciones se despliegan en 22 clases finas (familiar_de ×4 parentescos, investigado_por ×3 etapas, las otras 15 —incluida ocupa_cargo, que ya no lleva atributo— tal cual) más vinculo_sin_tipo, 23 en total. La vigencia (vigente, pasada, futura) es un eje aparte, común a las 23, que no las multiplica por tres. Se evalúa a los dos niveles.
 
 Puertas por relación: una relación se publica en el modelo cuando cumple dos condiciones, medidas al final de la etapa 2: al menos 60 ejemplos positivos en entrenamiento tras filtros, y acuerdo entre el oro humano y el maestro ≥ 0,70 F1 en la prueba. La que no cumpla se entrena igual pero en inferencia se colapsa a vinculo_sin_tipo, y se documenta. apoya_a y se_opone_a son las candidatas a caer.
+
+`norma`, `obra` y `monto` quedan sin relación propia en este esquema de poder (`norma` no por diseño sino por descuido: 160 normas marcadas en el oro y ninguna relación que las toque hasta la corrección de arriba, que le da destino en apoya_a y se_opone_a). `obra` y `monto` siguen huérfanos a propósito: se extraen para buscar, para hipervincular y como contexto, no para el grafo de poder. El monto, además, en FollowTheMoney es una propiedad de la arista de pago y no un nodo; lo correcto en una versión siguiente es que sea un atributo de financia_a y contrato_a, no una relación aparte.
+
+**Relaciones candidatas para la v0.2.** Entran cuando cumplan el mismo criterio que publica una relación (arriba): al menos 60 ejemplos positivos y acuerdo humano ≥ 0,70, medidos al cerrar la etapa 1.
+
+- `autor_de` (persona, organizacion → norma, obra): separaría a quien redacta o radica una norma de quien solo la respalda. Hay frecuencia de sobra en el archivo (1.182 artículos con «radicó», «presentó el proyecto» o «autor del proyecto»; 2.436 con «impulsó» o «sacó adelante»; 1.932 con «ponente»), pero no hay evidencia todavía de que la frontera con apoya_a se pueda anotar con acuerdo: «sacó adelante» cae en medio. Por eso espera, y mientras tanto la autoría se anota como apoya_a.
+- `amigo_de`: la amistad hoy va a vinculo_sin_tipo. En las relaciones de Quién-AI que se pudieron anclar al texto aparece 9 veces de 27.500, lejos del umbral; se revisa con el oro nuevo.
 
 ### 3.3 Mapeo desde los 35 predicados de legajo
 
