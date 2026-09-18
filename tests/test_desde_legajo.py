@@ -82,6 +82,73 @@ def test_plata_legajo():
     assert d.clase_fina_de(d.relaciones[0]) == "familiar_de:hijo_de"
 
 
+def test_oro_json_descarta_monto_y_obra():
+    # `monto` y `obra` salieron del esquema de enrel (decisión del 2026-09-17): legajo puede
+    # seguir anotándolos, pero el exportador los descarta con el mismo mecanismo que ya
+    # descartaba `evento` (un tipo de legajo sin equivalente en enrel): solo se pierde esa
+    # mención, no el documento, y las relaciones que la tocan quedan fuera solas.
+    cuerpo = "Álvaro Uribe recibió 10 mil millones de pesos y salió en Detector de Mentiras."
+    art = Articulo(
+        wp_id=99,
+        titulo="",
+        texto_plano=cuerpo,
+        palabras=12,
+        url="https://www.lasillavacia.com/silla-nacional/x/",
+        fecha="2020-01-01",
+        seccion="silla-nacional",
+    )
+    spec = {
+        "wp_id": 99,
+        "parrafos": {
+            "0": {
+                "E": [
+                    ["Álvaro Uribe", "persona"],
+                    ["10 mil millones de pesos", "monto"],
+                    ["Detector de Mentiras", "obra"],
+                ],
+                "R": [
+                    ["Álvaro Uribe", "vínculo sin tipo", "Detector de Mentiras"],
+                    ["Álvaro Uribe", "vínculo sin tipo", "10 mil millones de pesos"],
+                ],
+            }
+        },
+    }
+    d = dl.documento_desde_oro_json(spec, art)
+    assert validar_documento(d) == []
+    assert [m.tipo for m in d.menciones] == ["persona"]
+    assert d.relaciones == []
+    assert d.origen["no_localizadas"] == 2  # las dos menciones de tipo desconocido, descartadas
+
+
+def test_sqlite_descarta_tipo_desconocido():
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    _esquema_legajo(con)
+    lote_id = 3
+    con.execute(
+        "INSERT INTO anotaciones (lote_id, wp_id, mid, pi, ini, fin, texto, tipo, designa, grupo)"
+        " VALUES (?, ?, 'm1', 0, 0, 9, 'Ana Pérez', 'persona', 0, NULL)",
+        (lote_id, ART_TRES_PERSONAS.wp_id),
+    )
+    con.execute(
+        "INSERT INTO anotaciones (lote_id, wp_id, mid, pi, ini, fin, texto, tipo, designa, grupo)"
+        " VALUES (?, ?, 'm2', 0, 11, 20, 'Beto Ruiz', 'monto', 0, NULL)",
+        (lote_id, ART_TRES_PERSONAS.wp_id),
+    )
+    con.execute(
+        "INSERT INTO relaciones (lote_id, wp_id, rid, a_mid, b_mid, predicado, cuando)"
+        " VALUES (?, ?, 'r1', 'm1', 'm2', 'vínculo sin tipo', 'vigente')",
+        (lote_id, ART_TRES_PERSONAS.wp_id),
+    )
+    con.commit()
+    d = dl.documento_desde_sqlite(con, lote_id, ART_TRES_PERSONAS)
+    assert validar_documento(d) == []
+    assert len(d.menciones) == 1
+    assert d.menciones[0].texto == "Ana Pérez"
+    assert d.relaciones == []  # la relación que tocaba «monto» se filtra sola, sin su mid
+    assert d.origen["no_localizadas"] == 1
+
+
 def test_apariciones_no_cruza_limites_de_palabra():
     # «Cali» no debe encajar dentro de «California»; solo la aparición real cuenta.
     assert dl._apariciones("En California y en Cali.", "Cali") == [(19, 23)]
@@ -188,14 +255,31 @@ def test_oro_real_completo():
     specs = dl.leer_oro_json(Path("datos-anteriores/entrenamiento/oro"))
     assert len(specs) == 125
     con = db.conectar(db.ruta_db())
-    errores, docs, no_loc = 0, 0, 0
+    errores, docs, no_loc, no_loc_sin_descarte = 0, 0, 0, 0
     for wp, spec in specs.items():
         art = db.articulo(con, wp)
         assert art is not None, wp
+        # Camino real: monto y obra siguen en los JSON del oro (legajo no se toca), y el
+        # exportador debe descartarlos sin romper el documento ni las demás menciones.
         d = dl.documento_desde_oro_json(spec, art)
         docs += 1
         no_loc += d.origen.get("no_localizadas", 0)
         errores += len(validar_documento(d))
+        # Aparte, con monto y obra ya quitados a mano del spec: aísla la señal real de "no
+        # localizado en el texto" (texto editado en WordPress) del descarte intencional de
+        # los dos tipos que salieron del esquema, que sería mucho más grande y tapa la otra.
+        spec_sin_descarte = {
+            "wp_id": spec["wp_id"],
+            "parrafos": {
+                pi: {"E": [[t, ty] for t, ty in p.get("E", []) if ty not in ("monto", "obra")], "R": p.get("R", [])}
+                for pi, p in spec.get("parrafos", {}).items()
+            },
+        }
+        d2 = dl.documento_desde_oro_json(spec_sin_descarte, art)
+        no_loc_sin_descarte += d2.origen.get("no_localizadas", 0)
     assert docs == 125 and errores == 0
     # Las menciones que no se pudieron localizar en el texto local deben ser pocas (texto editado en WordPress).
-    assert no_loc < 60
+    assert no_loc_sin_descarte < 60
+    # Con monto y obra dentro, el descarte intencional infla mucho el contador (es el mismo
+    # que usa el mecanismo de «evento»); solo se comprueba que sea mayor, no un tope fijo.
+    assert no_loc >= no_loc_sin_descarte

@@ -11,8 +11,6 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 | lugar | nombre propio de país, departamento, municipio, corregimiento, barrio, región o sede física con nombre («Colombia», «Antioquia», «Medellín», «Palacio de Nariño»). | «el país», «la región», «la capital», «los municipios» sin nombre. |
 | cargo | cargo, puesto o título, con o sin titular, incluyendo su complemento («ministro de Hacienda», «senador», «alcalde de Medellín», «magistrado de la Corte Constitucional», «Gobernador de Antioquia»); también cuando el texto lo usa para designar a alguien sin nombrarlo («el Gobernador de Antioquia»). | oficios genéricos («abogado», «periodista», «empresario», «profesor») salvo como cargo institucional («profesor titular de la Universidad Nacional»); parentescos («esposa de»). |
 | norma | ley, decreto, sentencia, acto legislativo, resolución, tratado o acuerdo identificable («Ley 1448 de 2011», «Decreto 1320 de 1998», «Acuerdo de Paz», «Sentencia C-355», «artículo 49 de la Constitución»). | «la ley», «un decreto», «la norma», «la reforma» sin identificar. |
-| obra | título de libro, informe, columna, programa, película, canción, medio como producto («Tierra de Nadie», «Detector de Mentiras», «Huevos Revueltos», «Revista Semana» cuando se nombra la publicación como obra). | «el informe», «un libro», «el artículo» sin título. |
-| monto | cantidad con cifra o palabra de cantidad: «10 mil millones de pesos», «30 %», «48 a 108 meses», «un millón de dólares». | «recursos», «plata», «salarios», cifras hipotéticas («supongamos dos millones»). |
 
 ## Relaciones
 

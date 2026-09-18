@@ -14,7 +14,6 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Si dos relaciones aplican al mismo par, se elige la más específica. Si el texto afirma dos hechos distintos (dirige y fundó), se marcan las dos.
 - El título del artículo forma parte del texto y sus entidades se marcan.
 - Los offsets de las menciones son de caracteres sobre el texto normalizado a NFC; los nombres se comparan con NFC y nunca se guardan índices de tokens.
-- Obra y monto se marcan como entidades (para buscar e hipervincular) pero no participan en ninguna relación del esquema.
 
 ## Tipos de entidad
 
@@ -37,14 +36,6 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 ### norma
 **Se marca:** ley, decreto, sentencia, acto legislativo, resolución, tratado o acuerdo identificable («Ley 1448 de 2011», «Decreto 1320 de 1998», «Acuerdo de Paz», «Sentencia C-355», «artículo 49 de la Constitución»).
 **No se marca:** «la ley», «un decreto», «la norma», «la reforma» sin identificar.
-
-### obra
-**Se marca:** título de libro, informe, columna, programa, película, canción, medio como producto («Tierra de Nadie», «Detector de Mentiras», «Huevos Revueltos», «Revista Semana» cuando se nombra la publicación como obra).
-**No se marca:** «el informe», «un libro», «el artículo» sin título.
-
-### monto
-**Se marca:** cantidad con cifra o palabra de cantidad: «10 mil millones de pesos», «30 %», «48 a 108 meses», «un millón de dólares».
-**No se marca:** «recursos», «plata», «salarios», cifras hipotéticas («supongamos dos millones»).
 
 ## Relaciones
 

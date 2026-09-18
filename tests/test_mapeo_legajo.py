@@ -10,6 +10,12 @@ def test_mapear_tipo():
     assert mapear_tipo("persona") == ("persona", False)
     with pytest.raises(ValueError):
         mapear_tipo("evento")
+    # `monto` y `obra` salieron del esquema de enrel (decisión del 2026-09-17): legajo sigue
+    # anotándolos, pero para enrel son, igual que `evento`, un tipo sin equivalente.
+    with pytest.raises(ValueError):
+        mapear_tipo("monto")
+    with pytest.raises(ValueError):
+        mapear_tipo("obra")
 
 
 @pytest.mark.parametrize(
@@ -59,7 +65,7 @@ def test_mapear_tipo():
             "vigente",
             Mapeo("investigado_por", "condenado", False, "vigente"),
         ),
-        ("ubicado en", "monto", "lugar", "vigente", Mapeo(SIN_TIPO, None, False)),
+        ("ubicado en", "cargo", "lugar", "vigente", Mapeo(SIN_TIPO, None, False)),
         ("citado en", "persona", "organizacion", "vigente", Mapeo(SIN_TIPO, None, False)),
         # vocabulario nuevo de legajo
         ("ocupó el cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "titular", False, "pasada")),
@@ -74,7 +80,7 @@ def test_mapear_tipo():
             Mapeo("investigado_por", "acusado", False, "vigente"),
         ),
         ("se opone a", "persona", "organizacion", "vigente", Mapeo("se_opone_a", None, False, "vigente")),
-        ("vínculo sin tipo", "monto", "obra", "vigente", Mapeo(SIN_TIPO, None, False)),
+        ("vínculo sin tipo", "cargo", "norma", "vigente", Mapeo(SIN_TIPO, None, False)),
         # `cuando` se propaga tal cual en relaciones que no son de cargo.
         ("trabaja en", "persona", "organizacion", "pasada", Mapeo("trabaja_en", None, False, "pasada")),
         ("miembro de", "persona", "organizacion", "pasada", Mapeo("miembro_de", None, False, "pasada")),

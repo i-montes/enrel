@@ -2,8 +2,13 @@ from enrel.esquema import tipos as t
 
 
 def test_tipos_y_constantes():
-    assert t.TIPOS == ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto")
-    assert (t.P, t.O, t.L, t.C, t.N, t.B, t.M) == t.TIPOS
+    # `monto` y `obra` salieron del esquema (decisión del 2026-09-17): sobre el oro de 125
+    # documentos, `monto` no tenía ninguna relación y `obra` solo aparecía en
+    # `vinculo_sin_tipo`, mezclada con nombres de secciones de un solo medio.
+    assert t.TIPOS == ("persona", "organizacion", "lugar", "cargo", "norma")
+    assert "obra" not in t.TIPOS
+    assert "monto" not in t.TIPOS
+    assert (t.P, t.O, t.L, t.C, t.N) == t.TIPOS
 
 
 def test_hay_18_relaciones_y_25_clases_finas():
@@ -56,12 +61,12 @@ def test_admite():
     assert t.admite("parte_de", "organizacion", "organizacion")
     assert not t.admite("parte_de", "persona", "organizacion")
     assert t.admite("ubicado_en", "lugar", "lugar")
-    assert not t.admite("ubicado_en", "monto", "lugar")
+    assert not t.admite("ubicado_en", "cargo", "lugar")
     assert t.admite("apoya_a", "organizacion", "cargo")
     assert t.admite("apoya_a", "persona", "norma")
     assert t.admite("se_opone_a", "organizacion", "norma")
     assert not t.admite("investigado_por", "persona", "norma")
-    assert t.admite(t.SIN_TIPO, "monto", "obra")
+    assert t.admite(t.SIN_TIPO, "persona", "norma")
     # impulsa_norma: acto legislativo (radicar, redactar, ser ponente, sacar adelante,
     # sancionar, aprobar) de persona u organización sobre una norma; direccional, no al revés.
     assert t.admite("impulsa_norma", "persona", "norma")

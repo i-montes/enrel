@@ -88,6 +88,16 @@ def test_validar_detecta_errores():
     assert any("duplicada" in e for e in errores)
 
 
+def test_validar_rechaza_tipo_desconocido():
+    # `monto` y `obra` salieron de TIPOS (decisión del 2026-09-17); cualquier grupo con un
+    # tipo que no esté en el esquema —incluidos esos dos— debe rechazar el documento.
+    d = doc_ejemplo()
+    d.menciones.append(Mencion("m6", 0, 13, "Gustavo Petro", "monto", "e5"))
+    d.grupos.append(Grupo("e5", "monto", "Gustavo Petro"))
+    errores = validar_documento(d)
+    assert any("tipo desconocido" in e for e in errores)
+
+
 def test_validar_vigencia_desconocida():
     d = doc_ejemplo()
     d.relaciones.append(Relacion("e1", "e4", "trabaja_en", vigencia="algun-dia"))

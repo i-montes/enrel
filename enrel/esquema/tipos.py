@@ -1,13 +1,20 @@
-"""El esquema de enrel: siete tipos de entidad, dieciocho relaciones y una de reserva.
+"""El esquema de enrel: cinco tipos de entidad, dieciocho relaciones y una de reserva.
 
 Fuente: docs/superpowers/specs/2026-09-16-enrel-diseno.md §3. Las definiciones en prosa
 viven en docs/guia-anotacion.md; aquí solo la estructura que el código necesita.
+
+`monto` y `obra` salieron del esquema (decisión del 2026-09-17): sobre el oro de 125
+documentos, `monto` no participa de ninguna de las 18 relaciones (0 aristas) y `obra` solo
+aparece en `vinculo_sin_tipo`, mezclando nombres de secciones propias de un solo medio con
+películas mencionadas al pasar. Legajo conserva sus 7 tipos; es el exportador de enrel
+(`enrel/anotacion/desde_legajo.py`) el que descarta estos dos grupos y las relaciones que
+los tocan, con el mismo mecanismo que ya descartaba el tipo `evento`.
 """
 
 from dataclasses import dataclass
 
-TIPOS: tuple[str, ...] = ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto")
-P, O, L, C, N, B, M = TIPOS  # noqa: E741 — nombres de una letra exigidos por la interfaz del esquema
+TIPOS: tuple[str, ...] = ("persona", "organizacion", "lugar", "cargo", "norma")
+P, O, L, C, N = TIPOS  # noqa: E741 — nombres de una letra exigidos por la interfaz del esquema
 
 
 @dataclass(frozen=True)
