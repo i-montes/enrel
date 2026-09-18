@@ -14,12 +14,17 @@ MiniMax se anotaron párrafo a párrafo, así que ninguna de las dos fuentes pod
 relación entre entidades que aparecen en párrafos distintos del mismo artículo; esas relaciones
 están ausentes de ambos lados y no entran en el cálculo de precisión, cobertura ni F1.
 
-# Evaluación de MiniMax v5 sin pistas (techo del maestro de legajo), esquema nuevo
+La tabla se rehizo tras el cambio de vigencia (ocupa_cargo recuperó el atributo titular/aspirante,
+ortogonal a la vigencia) y de rangos (apoya_a y se_opone_a admiten norma): el oro y la plata de
+esta versión se reexportaron con ese esquema, así que la fila de vigencia ya no sale en 1,00 por
+defecto.
+
+# Evaluación de MiniMax v5 sin pistas (techo del maestro de legajo), esquema con vigencia
 
 Fecha: 2026-09-17 · documentos: 50
 
-- `oro`: `247777c9c69d21f488faa998cd939c97eaf6641b58303c8048bd03eb785370aa`
-- `pred`: `abab116ecb491ed3068f9b7dc0b70965d2a37cefee1fa15997ca89e4170a1daf`
+- `oro`: `73c6efeacbd2d1446413d53ef02e20d28aad94e85e97462e1fdc1bff50fca147`
+- `pred`: `2c39e8f6294c7793a5394da051ee406d8ac0506ecccec2d0003186f0cf5a02f8`
 
 ### Entidades, estricto
 
@@ -60,19 +65,20 @@ Fecha: 2026-09-17 · documentos: 50
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
 | miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo | 246 | 0.75 | 0.60 | 0.67 |  |
-| parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
+| ocupa_cargo | 245 | 0.75 | 0.60 | 0.67 |  |
+| parte_de | 11 | 0.13 | 0.36 | 0.19 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
-| se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
+| se_opone_a | 17 | 0.50 | 0.35 | 0.41 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
-| vinculo_sin_tipo | 26 | 0.20 | 0.38 | 0.26 |  |
-| micro | 531 | 0.52 | 0.49 | 0.51 | [0.46, 0.55] |
-| micro sin reserva | 505 | 0.56 | 0.50 | 0.53 |  |
+| vinculo_sin_tipo | 26 | 0.20 | 0.38 | 0.27 |  |
+| micro | 530 | 0.52 | 0.49 | 0.51 | [0.45, 0.55] |
+| micro sin reserva | 504 | 0.56 | 0.50 | 0.53 |  |
 | macro |  |  |  | 0.45 |  |
 | direccion (tasa = R) | 249 |  | 0.98 |  |  |
+| vigencia (tasa = R) | 262 |  | 0.93 |  |  |
 
 ### Relaciones gruesas, RE+
 
@@ -87,19 +93,20 @@ Fecha: 2026-09-17 · documentos: 50
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
 | miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo | 246 | 0.75 | 0.60 | 0.67 |  |
-| parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
+| ocupa_cargo | 245 | 0.75 | 0.60 | 0.67 |  |
+| parte_de | 11 | 0.13 | 0.36 | 0.19 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
-| se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
+| se_opone_a | 17 | 0.50 | 0.35 | 0.41 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
 | vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 531 | 0.52 | 0.49 | 0.50 | [0.45, 0.55] |
-| micro sin reserva | 505 | 0.56 | 0.50 | 0.53 |  |
+| micro | 530 | 0.51 | 0.49 | 0.50 | [0.45, 0.55] |
+| micro sin reserva | 504 | 0.55 | 0.50 | 0.52 |  |
 | macro |  |  |  | 0.45 |  |
 | direccion (tasa = R) | 248 |  | 0.98 |  |  |
+| vigencia (tasa = R) | 259 |  | 0.93 |  |  |
 
 ### Relaciones finas, RE+
 
@@ -118,18 +125,18 @@ Fecha: 2026-09-17 · documentos: 50
 | investigado_por:investigado | 18 | 1.00 | 0.11 | 0.20 |  |
 | miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
-| ocupa_cargo:actual | 165 | 0.77 | 0.54 | 0.63 |  |
-| ocupa_cargo:anterior | 70 | 0.65 | 0.60 | 0.62 |  |
-| ocupa_cargo:aspirante | 11 | 0.41 | 0.64 | 0.50 |  |
-| parte_de | 11 | 0.14 | 0.36 | 0.20 |  |
+| ocupa_cargo:aspirante | 11 | 0.50 | 0.64 | 0.56 |  |
+| ocupa_cargo:titular | 234 | 0.77 | 0.60 | 0.67 |  |
+| parte_de | 11 | 0.13 | 0.36 | 0.19 |  |
 | propietario_de | 12 | 1.00 | 1.00 | 1.00 |  |
-| se_opone_a | 17 | 0.55 | 0.35 | 0.43 |  |
+| se_opone_a | 17 | 0.50 | 0.35 | 0.41 |  |
 | socio_de | 2 | insuficiente | insuficiente | insuficiente |  |
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
 | vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 531 | 0.50 | 0.47 | 0.48 |  |
-| micro sin reserva | 505 | 0.53 | 0.48 | 0.50 |  |
-| macro |  |  |  | 0.47 |  |
-| direccion (tasa = R) | 238 |  | 0.97 |  |  |
+| micro | 530 | 0.51 | 0.49 | 0.50 |  |
+| micro sin reserva | 504 | 0.55 | 0.50 | 0.52 |  |
+| macro |  |  |  | 0.46 |  |
+| direccion (tasa = R) | 248 |  | 0.98 |  |  |
+| vigencia (tasa = R) | 259 |  | 0.93 |  |  |

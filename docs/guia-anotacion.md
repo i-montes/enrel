@@ -14,6 +14,7 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Si dos relaciones aplican al mismo par, se elige la más específica. Si el texto afirma dos hechos distintos (dirige y fundó), se marcan las dos.
 - El título del artículo forma parte del texto y sus entidades se marcan.
 - Los offsets de las menciones son de caracteres sobre el texto normalizado a NFC; los nombres se comparan con NFC y nunca se guardan índices de tokens.
+- Obra y monto se marcan como entidades (para buscar e hipervincular) pero no participan en ninguna relación del esquema.
 
 ## Tipos de entidad
 
@@ -48,19 +49,22 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 ## Relaciones
 
 ### ocupa_cargo
-**Definición:** Una persona ejerce, ejerció o busca un cargo. La cabeza es la persona; la cola es el cargo. Es la relación central del grafo de poder y la más frecuente. Si el texto da el cargo, se usa esta relación y no trabaja_en ni dirige.
+**Definición:** Una persona ejerce o ejerció un cargo (`titular`), o se postula o se postuló a él (`aspirante`). La cabeza es la persona; la cola es el cargo. Es la relación central del grafo de poder y la más frecuente. Si el texto da el cargo, se usa esta relación y no trabaja_en ni dirige. El atributo (titular/aspirante) es una modalidad, ortogonal a la vigencia (vigente/pasada/futura): una candidatura perdida es `aspirante` + `pasada`, no `titular` + algo; un nombramiento anunciado que aún no asume es `titular` + `futura`, no una candidatura.
+**Atributos:** titular: ejerce, ejerció o ejercerá el cargo; aspirante: se postula o se postuló al cargo, candidato, precandidato, aspirante.
 **Ejemplos:**
-- «El ministro de Hacienda, José Manuel Restrepo, anunció…» → Restrepo ocupa_cargo:actual «ministro de Hacienda».
-- «El exalcalde de Medellín Daniel Quintero» → Quintero ocupa_cargo:anterior «exalcalde de Medellín».
-- «Vicky Dávila, candidata presidencial» → Dávila ocupa_cargo:aspirante «candidata presidencial».
-- «El entonces gobernador de Antioquia, Luis Alfredo Ramos» → Ramos ocupa_cargo:anterior «gobernador de Antioquia».
+- «El ministro de Hacienda, José Manuel Restrepo, anunció…» → Restrepo ocupa_cargo:titular «ministro de Hacienda» (vigente).
+- «El exalcalde de Medellín Daniel Quintero» → Quintero ocupa_cargo:titular «exalcalde de Medellín» (pasada).
+- «Vicky Dávila, candidata presidencial» → Dávila ocupa_cargo:aspirante «candidata presidencial» (vigente).
+- «Aspiró a la Presidencia en 2018 y perdió» → (persona) ocupa_cargo:aspirante «Presidencia» (pasada): perdió la candidatura, no llegó a ejercer el cargo.
+- «El entonces gobernador de Antioquia, Luis Alfredo Ramos» → Ramos ocupa_cargo:titular «gobernador de Antioquia» (pasada).
 **No es:**
 - «Trabajó en el Ministerio de Hacienda» sin cargo nombrado: es trabaja_en con la organización.
 - «El abogado Pérez»: «abogado» es oficio, no cargo; no se marca relación.
 **Confusiones:**
 - Con trabaja_en: si hay cargo nombrado, ocupa_cargo; si solo hay organización, trabaja_en.
 - Con dirige: «alcaldesa de Bogotá» es ocupa_cargo con el cargo; dirige solo si además se menciona la organización («la Alcaldía»).
-- Con nombro_a: «Petro nombró a X ministro» produce nombro_a (Petro → X) y ocupa_cargo:actual (X → ministro).
+- Con nombro_a: «Petro nombró a X ministro» produce nombro_a (Petro → X) y ocupa_cargo:titular (X → ministro), vigente.
+- Titular frente a aspirante: un candidato derrotado nunca es titular; «será ministro» de un nombramiento ya anunciado sí es titular (vigencia futura), no aspirante.
 
 ### nombro_a
 **Definición:** Una persona u organización designa a una persona para un cargo o función. La cabeza es quien nombra; la cola es la persona nombrada.
@@ -103,7 +107,7 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 ### dirige
 **Definición:** Una persona encabeza, preside o gerencia una organización. La cabeza es la persona; la cola es la organización.
 **Ejemplos:**
-- «Ricardo Roa, presidente de Ecopetrol» → Roa dirige Ecopetrol, y Roa ocupa_cargo:actual «presidente de Ecopetrol».
+- «Ricardo Roa, presidente de Ecopetrol» → Roa dirige Ecopetrol, y Roa ocupa_cargo:titular «presidente de Ecopetrol».
 - «La firma es gerenciada por Juan Pérez» → Pérez dirige (la firma).
 - «Roy Barreras preside el Senado» → Barreras dirige Senado.
 **No es:**
@@ -212,11 +216,12 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Con hijo_de invertido: «su papá, Ricardo Romero» dicho de Camilo Romero produce Camilo familiar_de:hijo_de Ricardo, nunca al revés.
 
 ### apoya_a
-**Definición:** Una persona u organización respalda explícitamente a otra persona, organización o candidatura: apoyo, alianza, adhesión, coalición. La cabeza es quien apoya; la cola es lo apoyado.
+**Definición:** Una persona u organización respalda explícitamente a otra persona, organización, candidatura o norma: apoyo, alianza, adhesión, coalición, autoría o respaldo de un proyecto de ley. La cabeza es quien apoya; la cola es lo apoyado. La autoría de una norma se anota como apoya_a (quien radica una ley la apoya) mientras no exista una relación propia para autoría.
 **Ejemplos:**
 - «El Partido Liberal respaldó la candidatura de Petro» → Partido Liberal apoya_a Petro.
 - «Aliado del gobierno» → (persona) apoya_a (gobierno nombrado).
 - «Cambio Radical se sumó a la coalición de Duque» → Cambio Radical apoya_a Duque.
+- «El senador radicó el proyecto de reforma tributaria» → senador apoya_a «reforma tributaria».
 **No es:**
 - Dos personas que aparecen en el mismo evento: no se marca.
 - «Petro nombró a X»: nombro_a.
@@ -225,16 +230,18 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Con se_opone_a: el signo contrario.
 
 ### se_opone_a
-**Definición:** Una persona u organización se opone o critica explícitamente a otra persona u organización. La cabeza es quien se opone; la cola es el criticado.
+**Definición:** Una persona u organización se opone o critica explícitamente a otra persona, organización o norma: oposición política, crítica, voto en contra o hundimiento de un proyecto de ley. La cabeza es quien se opone; la cola es lo criticado o combatido.
 **Ejemplos:**
 - «Uribe criticó al gobierno de Petro» → Uribe se_opone_a Petro.
 - «El Centro Democrático, en oposición al gobierno» → Centro Democrático se_opone_a (gobierno nombrado).
 - «Rival político de Char» → (persona) se_opone_a Char.
+- «La bancada del Centro Democrático votó en contra de la reforma» → Centro Democrático se_opone_a «reforma».
 **No es:**
-- «Criticó la reforma»: la cola es una norma, no se marca.
 - Dos candidatos al mismo cargo sin que el texto afirme rivalidad: no se marca.
+- «El proyecto fue radicado por Pérez»: eso es apoyo (apoya_a), no oposición.
 **Confusiones:**
 - Con investigado_por: denunciar penalmente ante una autoridad es se_opone_a solo si el texto lo presenta como oposición; la investigación la marca la autoridad.
+- Con apoya_a: criticar, votar en contra o hundir un proyecto es se_opone_a; radicarlo, impulsarlo o votar a favor es apoya_a.
 
 ### investigado_por
 **Definición:** Una persona u organización está siendo investigada, imputada, acusada o fue condenada por una autoridad. La cabeza es el investigado; la cola es la autoridad. El delito no es una entidad y no se marca.

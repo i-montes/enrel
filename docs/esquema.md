@@ -18,7 +18,7 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 
 | Relación | De → a | Simétrica | Atributos | Familia | FollowTheMoney | Wikidata |
 |---|---|---|---|---|---|---|
-| ocupa_cargo | persona → cargo | no | — | A | Occupancy | P39 |
+| ocupa_cargo | persona → cargo | no | titular, aspirante | A | Occupancy | P39 |
 | nombro_a | organizacion, persona → persona | no | — | A | — | P748 |
 | sucedio_a | persona → persona | no | — | A | Succession | P1365 |
 | trabaja_en | persona → organizacion | no | — | A | Employment | P108 |
@@ -31,8 +31,8 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 | contrato_a | organizacion, persona → organizacion, persona | no | — | B | ContractAward | — |
 | financia_a | organizacion, persona → organizacion, persona | no | — | B | Payment | P859 |
 | familiar_de | persona → persona | sí | conyuge, hijo_de, hermano, otro | C | Family | P26, P40, P22, P25, P3373, P1038 |
-| apoya_a | organizacion, persona → cargo, organizacion, persona | no | — | C | — | — |
-| se_opone_a | organizacion, persona → organizacion, persona | no | — | C | — | — |
+| apoya_a | organizacion, persona → cargo, norma, organizacion, persona | no | — | C | — | — |
+| se_opone_a | organizacion, persona → norma, organizacion, persona | no | — | C | — | — |
 | investigado_por | organizacion, persona → organizacion | no | investigado, acusado, condenado | C | CourtCaseParty | P1399 |
 | ubicado_en | lugar, organizacion, persona → lugar | no | — | C | — | P159, P551, P131 |
 | vinculo_sin_tipo | cualquiera ↔ cualquiera | sí | — | — | UnknownLink | — |
@@ -49,8 +49,8 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | apoya a | nuevo | apoya_a | apoya_a | apoya_a | apoya_a |
 | apoyó a | viejo | apoya_a | apoya_a | apoya_a | apoya_a |
 | asesor de | viejo | vinculo_sin_tipo | trabaja_en | vinculo_sin_tipo | vinculo_sin_tipo |
-| aspira a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
-| aspira al cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
+| aspira a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:aspirante | vinculo_sin_tipo |
+| aspira al cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:aspirante | vinculo_sin_tipo |
 | autor de | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | citado en | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | condenado por | viejo y nuevo | vinculo_sin_tipo | investigado_por:condenado | vinculo_sin_tipo | investigado_por:condenado |
@@ -71,13 +71,13 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | investigado por | viejo y nuevo | vinculo_sin_tipo | investigado_por:investigado | vinculo_sin_tipo | investigado_por:investigado |
 | miembro de | viejo y nuevo | vinculo_sin_tipo | miembro_de | vinculo_sin_tipo | vinculo_sin_tipo |
 | nombró a | viejo y nuevo | nombro_a | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
-| ocupa el cargo | viejo y nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
-| ocupó el cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
+| ocupa el cargo | viejo y nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:titular | vinculo_sin_tipo |
+| ocupó el cargo | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:titular | vinculo_sin_tipo |
 | opositor de | viejo | se_opone_a | se_opone_a | vinculo_sin_tipo | se_opone_a |
 | padre o madre de | viejo | familiar_de:hijo_de (invertida) | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | parte de | viejo y nuevo | vinculo_sin_tipo | miembro_de | vinculo_sin_tipo | parte_de |
 | propietario de | nuevo | vinculo_sin_tipo | propietario_de | vinculo_sin_tipo | propietario_de |
-| renunció a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo | vinculo_sin_tipo |
+| renunció a | viejo | vinculo_sin_tipo | vinculo_sin_tipo | ocupa_cargo:titular | vinculo_sin_tipo |
 | sanciona con | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | se opone a | nuevo | se_opone_a | se_opone_a | vinculo_sin_tipo | se_opone_a |
 | se reunió con | viejo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |

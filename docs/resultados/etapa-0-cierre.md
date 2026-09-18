@@ -25,8 +25,8 @@ detalle están en `docs/resultados/etapa-0-corpus.md` (corpus congelado y selecc
 | Entidades, F1 estricto (techo del maestro de legajo, esquema nuevo, prueba) | 0,75 [0,71, 0,78] |
 | Entidades, F1 parcial | 0,78 |
 | RE+, F1 micro (incluye `vinculo_sin_tipo`) | 0,50 [0,45, 0,55] |
-| RE+, F1 micro sin reserva (excluye `vinculo_sin_tipo`) | 0,53 |
-| RE+, F1 micro a clases finas (incluye `vinculo_sin_tipo`) | 0,48 |
+| RE+, F1 micro sin reserva (excluye `vinculo_sin_tipo`) | 0,52 |
+| RE+, F1 micro a clases finas (incluye `vinculo_sin_tipo`) | 0,50 |
 | Backbone: parámetros | 149,7 M |
 | Backbone: tokens por palabra | 1,35 |
 | Backbone: p95 tokens | 1.206 |
@@ -42,6 +42,14 @@ el humo de velocidad, pero la ruta de despliegue int8 se decide en la etapa 3 co
 Nota (ronda de arreglos finales): RE y RE+ ahora se distinguen de verdad (antes `emparejar_grupos` filtraba por
 tipo y RE+ nunca podía diferir de RE), y el micro ahora incluye la reserva `vinculo_sin_tipo`; las cifras de esta
 tabla y de `docs/resultados/etapa-0-legajo.md` reflejan ese cambio.
+
+Nota (correcciones de esquema post-cierre): `ocupa_cargo` recuperó un atributo, pero con otro significado —
+`titular`/`aspirante`, una modalidad ortogonal a la vigencia, en vez del viejo `actual`/`anterior`/`aspirante` que
+se había fundido con la vigencia— y `apoya_a`/`se_opone_a` admiten `norma` en la cola (antes ninguna relación
+tocaba `norma`, `obra` ni `monto`). El oro y la plata de legajo se reexportaron con ese esquema; la fila de
+vigencia de `docs/resultados/etapa-0-legajo.md` ya no sale en 1,00 por defecto (ahora R = 0,93), y el F1 micro a
+clases finas de RE+ sube de 0,48 a 0,50 al dejar de mezclar vigencia y atributo en `ocupa_cargo`. Las demás
+cifras de esta tabla se actualizaron arriba.
 
 ## Pendiente: cuando el usuario cierre el lote de los 40 perfiles
 
