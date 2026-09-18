@@ -26,6 +26,7 @@ Fuera de alcance de la v0.1: enlazado a Wikidata, correferencia entre artículos
 | MiniMax como anotador y verificador, cinco llamadas por artículo | Un solo prompt con 35 predicados; segundo maestro | Definiciones con ejemplos en el prompt valen +13 F1 (GoLLIE); consultar 5 o 6 relaciones por llamada evita la confusión entre esquemas parecidos (IEPile); la verificación ataca el ruido dominante de los LLM, que es de tipo equivocado. Un segundo maestro se suma solo si el primero no pasa la puerta. |
 | Oro corregido por el usuario, 15 a 25 horas | Periodistas; ningún oro | Es lo disponible. Se concentra donde nada lo sustituye: el conjunto de prueba congelado. |
 | Título antepuesto al cuerpo en todos los documentos | Cuerpo solo | En perfiles y en muchas noticias el sujeto principal aparece nombrado en el título y elidido en el cuerpo. |
+| Vigencia como eje propio de toda relación (vigente, pasada, futura, relativo a la fecha del artículo), no como atributo solo de ocupa_cargo | Dejar la vigencia únicamente en el atributo estado de ocupa_cargo | El 14 % de las relaciones del oro trae vigencia no trivial en relaciones que no son de cargo (409 pasadas y 29 futuras de 1.548, de las que 229 pasadas son de cargo): limitarla a ocupa_cargo perdía la mayor parte de esa información. Decisión del 2026-09-17; las clases finas bajan de 25 a 23. |
 
 ## 3. Esquema
 
@@ -57,7 +58,7 @@ Diecisiete relaciones tipadas más una de reserva. Cada una tiene dominio y rang
 
 | Relación | De → a | Simétrica | Atributo | Absorbe de legajo | FollowTheMoney / Wikidata |
 |---|---|---|---|---|---|
-| ocupa_cargo | persona → cargo | no | estado: actual, anterior, aspirante | ocupa el cargo, aspira a, renunció a | Occupancy / P39 |
+| ocupa_cargo | persona → cargo | no | — | ocupa el cargo, aspira a, renunció a | Occupancy / P39 |
 | nombro_a | persona, organizacion → persona | no | — | nombró a | — / P748 |
 | sucedio_a | persona → persona | no | — | sucedió a | Succession / P1365 |
 | miembro_de | persona → organizacion | no | — | miembro de; parte de (persona→org) | Membership / P102, P463 |
@@ -76,10 +77,12 @@ Diecisiete relaciones tipadas más una de reserva. Cada una tiene dominio y rang
 | se_opone_a | persona, organizacion → persona, organizacion | no | — | opositor de, criticó a | — |
 | vinculo_sin_tipo | cualquiera ↔ cualquiera | sí | — | se reunió con, demandó a, y lo que no encaja | UnknownLink |
 
+Todas las relaciones llevan además un campo `vigencia`, eje propio y no un atributo más: `vigente`, `pasada` o `futura`, por defecto `vigente`, siempre relativo a la fecha del artículo (la fecha dice cuándo se afirmó algo, no cuándo fue verdad). `futura` cubre tanto lo anunciado («asumirá», «será») como lo aspirado («aspira a la Presidencia»), que es como ya lo trataba el vocabulario de legajo. Por eso ocupa_cargo pierde los atributos de la tabla anterior (actual, anterior, aspirante): eran exactamente este eje, ahora expresado una sola vez para las 17 relaciones en lugar de repetido solo en una. En las relaciones que son sucesos y no estados —`nombro_a`, `sucedio_a`, `fundo`, `contrato_a`, `financia_a`, señaladas por `es_suceso(relacion)`— la vigencia rara vez aplica y normalmente se queda en `vigente`.
+
 Reglas de desambiguación que van a la guía y al prompt:
 
 - ocupa_cargo exige un cargo como objeto. Si el texto da el cargo, es ocupa_cargo y no trabaja_en. «Alcaldesa de Bogotá» produce ocupa_cargo (persona→cargo) y dirige (persona→«Alcaldía de Bogotá») solo si la organización está mencionada.
-- estado de ocupa_cargo: «actual» si el texto habla en presente o no marca fin; «anterior» con «ex», «fue», «entonces», «hasta»; «aspirante» con «candidato», «aspira», «precandidato».
+- vigencia, para toda relación: «pasada» con «ex», «fue», «entonces», «hasta», «exministro»; «futura» con «candidato», «aspira», «precandidato», «asumirá», «será»; «vigente» en los demás casos, incluido el presente sin marca de fin.
 - miembro_de es pertenencia sin empleo: militancia en un partido o movimiento, membresía de una junta, comisión o colectivo. Un adjetivo de afiliación («el liberal X») no basta; hace falta que el texto afirme la pertenencia.
 - trabaja_en es empleo o asesoría en una organización que no es partido, sin cargo nombrado. Si hay cargo, ocupa_cargo. Si dirige, dirige.
 - parte_de solo entre organizaciones («la Facultad es parte de la Universidad», «filial de»). Una persona nunca es parte_de.
@@ -89,7 +92,7 @@ Reglas de desambiguación que van a la guía y al prompt:
 - Las simétricas se anotan una sola vez; el exportador las duplica si el entrenamiento lo requiere.
 - hijo_de se anota con la cabeza en el hijo; padre o madre se deriva. Nunca se anotan las dos direcciones.
 
-Clases finas del clasificador: las 17 relaciones se despliegan en 24 clases finas (ocupa_cargo ×3 estados, familiar_de ×4 parentescos, investigado_por ×3 etapas, las otras 14 tal cual) más vinculo_sin_tipo. Se evalúa a los dos niveles.
+Clases finas del clasificador: las 17 relaciones se despliegan en 22 clases finas (familiar_de ×4 parentescos, investigado_por ×3 etapas, las otras 15 —incluida ocupa_cargo, que ya no lleva atributo— tal cual) más vinculo_sin_tipo, 23 en total. La vigencia (vigente, pasada, futura) es un eje aparte, común a las 23, que no las multiplica por tres. Se evalúa a los dos niveles.
 
 Puertas por relación: una relación se publica en el modelo cuando cumple dos condiciones, medidas al final de la etapa 2: al menos 60 ejemplos positivos en entrenamiento tras filtros, y acuerdo entre el oro humano y el maestro ≥ 0,70 F1 en la prueba. La que no cumpla se entrena igual pero en inferencia se colapsa a vinculo_sin_tipo, y se documenta. apoya_a y se_opone_a son las candidatas a caer.
 
@@ -129,7 +132,8 @@ Para cada par ordenado de grupos (cabeza, cola) de tipos admitidos por al menos 
 
 - Representación de cada grupo: logsumexp sobre las representaciones de sus menciones (estado de la primera subpalabra de cada mención).
 - Contexto local del par: agregación de los estados del documento ponderada por la atención que las menciones de cabeza y cola prestan a cada posición, tomada de la última capa del codificador (la técnica de ATLOP, sin parámetros extra).
-- Clasificador: proyecciones de cabeza y cola concatenadas con el contexto, bilineal agrupado (grupos de 64), salida de 25 logits (24 clases finas más vinculo_sin_tipo) más un logit de umbral aprendido.
+- Clasificador: proyecciones de cabeza y cola concatenadas con el contexto, bilineal agrupado (grupos de 64), salida de 23 logits (22 clases finas más vinculo_sin_tipo) más un logit de umbral aprendido.
+- Cabeza de vigencia: una cabeza pequeña aparte sobre la misma representación del par (proyecciones de cabeza y cola más contexto), con 3 salidas (vigente, pasada, futura); no se multiplican las clases finas por tres, que reventaría la cola larga. Pérdida propia de entropía cruzada, sumada a la de relaciones con un peso configurable. Decodificación por argmax de esas 3 salidas. Línea base a batir: una regla léxica sobre la oración de evidencia («ex», «fue», «entonces», «exministro», «asumirá», «será»), la misma que ya usa legajo para proponerla.
 - Máscara de tipos: los logits de las relaciones que no admiten el par de tipos se fijan a −∞ antes de la pérdida y de la decodificación.
 - Pérdida: umbral adaptativo (una clase TH por par; las positivas deben superar a TH y TH debe superar a las negativas) con reponderación focal adaptativa para la cola larga (KD-DocRE). Sin umbral global que calibrar.
 - Decodificación: toda clase con logit mayor que TH es positiva; si ninguna lo supera, no hay relación. Las simétricas se colapsan a una fila. Se devuelve la confianza como sigmoide de la diferencia con TH.
@@ -147,12 +151,12 @@ JSON por documento, offsets de caracteres sobre el texto de entrada:
   "texto_hash": "sha256…",
   "menciones": [{"id": "m1", "ini": 88, "fin": 99, "texto": "Tomás Uribe", "tipo": "persona", "grupo": "e1", "confianza": 0.98}],
   "grupos": [{"id": "e1", "tipo": "persona", "canonico": "Tomás Uribe", "menciones": ["m1", "m7"]}],
-  "relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "familiar_de", "atributo": "hijo_de", "confianza": 0.91, "evidencia": {"ini": 60, "fin": 140}}],
+  "relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "familiar_de", "atributo": "hijo_de", "vigencia": "vigente", "confianza": 0.91, "evidencia": {"ini": 60, "fin": 140}}],
   "modelo": "enrel-base-es-0.1", "esquema": "0.1"
 }
 ```
 
-Un exportador convierte esta salida a entidades y aristas de FollowTheMoney con `sourceUrl`, `proof` (la evidencia) y `retrievedAt`.
+`vigencia` toma vigente, pasada o futura, relativa a la fecha del artículo; en las relaciones marcadas por `es_suceso` normalmente vale vigente. Un exportador convierte esta salida a entidades y aristas de FollowTheMoney con `sourceUrl`, `proof` (la evidencia) y `retrievedAt`.
 
 ### 4.6 Exportación e inferencia
 
@@ -201,13 +205,13 @@ Modelo: el MiniMax disponible por API compatible con OpenAI, sin razonamiento, t
 
 **Llamadas 2 a 4, relaciones por familia.** Entrada: el texto, la lista de entidades de la llamada 1 con sus identificadores, y la familia:
 
-- Familia A, cargos y trabajo: ocupa_cargo (con estado), nombro_a, sucedio_a, trabaja_en, dirige, miembro_de.
+- Familia A, cargos y trabajo: ocupa_cargo, nombro_a, sucedio_a, trabaja_en, dirige, miembro_de.
 - Familia B, empresa y dinero: fundo, propietario_de, socio_de, parte_de, contrato_a, financia_a.
 - Familia C, familia, política, justicia y lugar: familiar_de (con parentesco), apoya_a, se_opone_a, investigado_por (con etapa), ubicado_en.
 
-Cada prompt lleva solo sus 5 o 6 relaciones con definición, tipos admitidos, tres positivos y dos negativos cercanos, y la lista de confusiones frecuentes con la relación correcta. Salida: `{"cabeza": id, "cola": id, "relacion", "atributo", "cita": subcadena literal}`. También puede devolver `vinculo_sin_tipo` cuando ve un vínculo que no encaja.
+Cada prompt lleva solo sus 5 o 6 relaciones con definición, tipos admitidos, tres positivos y dos negativos cercanos, y la lista de confusiones frecuentes con la relación correcta. Salida: `{"cabeza": id, "cola": id, "relacion", "atributo", "vigencia", "cita": subcadena literal}`. También puede devolver `vinculo_sin_tipo` cuando ve un vínculo que no encaja. Cada relación propuesta lleva además `vigencia` (vigente, pasada o futura), relativa a la fecha del artículo, que el prompt da junto con el resto de metadatos y explica junto con las marcas del texto que la señalan.
 
-**Llamada 5, verificación.** Entrada: el texto y todas las relaciones propuestas, cada una con su cita. Pregunta por cada una: ¿el texto afirma exactamente esto entre estas dos entidades, con esta relación y dirección? Salida: `confirmada`, `rechazada` con motivo, o `corregida` con la relación correcta. Solo entran a la plata las confirmadas o corregidas.
+**Llamada 5, verificación.** Entrada: el texto y todas las relaciones propuestas, cada una con su cita y su vigencia. Pregunta por cada una: ¿el texto afirma exactamente esto entre estas dos entidades, con esta relación, esta dirección y esta vigencia? Salida: `confirmada`, `rechazada` con motivo, o `corregida` con la relación, el atributo o la vigencia correctos. Solo entran a la plata las confirmadas o corregidas.
 
 Filtros a la salida, en orden, con contadores por corrida:
 
@@ -231,7 +235,7 @@ Un JSONL por conjunto en `datos/anotado/<conjunto>.jsonl`, una fila por document
   "texto": "Título\n\nCuerpo…",
   "menciones": [{"id": "m1", "ini": 88, "fin": 99, "texto": "Tomás Uribe", "tipo": "persona", "grupo": "e1"}],
   "grupos": [{"id": "e1", "tipo": "persona", "canonico": "Tomás Uribe"}],
-  "relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "familiar_de", "atributo": "hijo_de", "evidencia": {"ini": 60, "fin": 140}}],
+  "relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "familiar_de", "atributo": "hijo_de", "vigencia": "vigente", "evidencia": {"ini": 60, "fin": 140}}],
   "fuente": "oro | plata-alta | plata", "origen": {"maestro": "MiniMax-M3", "prompt": "1.0", "mapeo_legajo": true}
 }
 ```
@@ -246,13 +250,13 @@ Opcionales, para un experimento de precalentamiento de la cabeza de relaciones, 
 
 Herramienta principal: la capa de revisión de legajo (paso 6), que el usuario ya domina. Las propuestas las pone el modelo afinado anterior de legajo, que saca bien las entidades; el usuario corrige tramos y tipos, resuelve identidades con `=` y arregla las relaciones, que es lo que estaba mal. El oro queda en las tablas `anotaciones`, `relaciones`, `resoluciones` y `tiempos` de `legajo.sqlite`, con el vocabulario de 35 predicados y el campo `cuando`.
 
-Exportador `enrel/anotacion/desde_legajo.py`: lee un lote de `legajo.sqlite` (ruta configurable, porque el usuario anota en el Mac o en el PC) o los JSON por artículo del formato de `oro_apartado.py`, aplica el mapeo de 3.3, convierte `cuando` (vigente → actual, pasada → anterior; «aspira a» → aspirante), toma los grupos de `resoluciones` («misma») y de las menciones repetidas, recompone el documento entero a partir de los párrafos con offsets globales, valida y escribe el formato interno. Prueba de ida y vuelta sobre los 125 artículos de oro existentes.
+Exportador `enrel/anotacion/desde_legajo.py`: lee un lote de `legajo.sqlite` (ruta configurable, porque el usuario anota en el Mac o en el PC) o los JSON por artículo del formato de `oro_apartado.py`, aplica el mapeo de 3.3, convierte `cuando` en `vigencia` para todas las relaciones (vigente → vigente, pasada → pasada, «aspira a» → futura) y mapea los tres predicados de cargo de legajo (`ocupa el cargo`, `ocupó el cargo`, `aspira al cargo`) a ocupa_cargo con la vigencia correspondiente —el mapeo también acepta los predicados viejos—, toma los grupos de `resoluciones` («misma») y de las menciones repetidas, recompone el documento entero a partir de los párrafos con offsets globales, valida y escribe el formato interno. Prueba de ida y vuelta sobre los 125 artículos de oro existentes.
 
 Límite conocido de esta vía: la revisión de legajo trabaja por párrafo, así que las relaciones cuyos extremos están en párrafos distintos no se pueden marcar. En la evaluación, una relación correcta del modelo que cruce párrafos aparecerá como falso positivo; la revisión manual de 50 falsos positivos de 8 la cuantifica y se reporta. Label Studio queda como herramienta opcional para una pasada posterior a nivel de documento, si esa cifra resulta alta.
 
 Convenciones que el usuario sigue al anotar en legajo para que el mapeo sea sin pérdidas (van también en la guía):
 
-1. Persona y cargo siempre separados, unidos por «ocupa el cargo»; `cuando` correcto, porque se convierte en el estado de ocupa_cargo; candidaturas con «aspira a».
+1. Persona y cargo siempre separados, unidos por «ocupa el cargo», «ocupó el cargo» o «aspira al cargo» según corresponda; `cuando` correcto, porque se convierte en la vigencia de la relación.
 2. Parentescos con el predicado fino («hijo de» con la cabeza en el hijo, «hermano de», «cónyuge o pareja de»); «familiar de» solo para tíos, primos, sobrinos, cuñados, suegros y similares. «Padre o madre de» se puede usar, el mapeo lo invierte.
 3. «Parte de» solo organización → organización; pertenencia de persona a partido, junta o colectivo con «miembro de»; empleo sin cargo nombrado con «trabaja en»; «asesor de» solo persona → organización.
 4. «Dueño de» y «socio de» persona → organización van a propietario_de; «socio de» persona ↔ persona se conserva como socio_de.
@@ -309,6 +313,7 @@ Relaciones:
 - Micro-F1 excluyendo «sin relación»; macro-F1; P, R, F1 por relación.
 - Ign-F1: se excluyen las tripletas (canónico cabeza, relación, canónico cola) que aparecen en entrenamiento.
 - Dirección: porcentaje de asimétricas con dirección correcta entre las que aciertan par y relación.
+- Vigencia: eje aparte; no entra en el acierto de RE ni de RE+ para no mezclar un eje ortogonal con el F1 de relaciones. Se publica como una fila «vigencia (tasa = R)» con solo `n` y la tasa de acierto `R`, sobre las relaciones donde el modelo ya acertó par y relación gruesa. En las relaciones que son sucesos (`es_suceso`: nombro_a, sucedio_a, fundo, contrato_a, financia_a) la vigencia normalmente vale vigente y se reporta aparte.
 - Por relación solo se publica F1 cuando la prueba tiene al menos 10 casos de esa relación; por debajo se reporta el conteo y «insuficiente». El oro de legajo mapeado a la prueba tiene 579 relaciones, de las que 264 son ocupa_cargo y varias relaciones quedan con menos de 10 (familiar_de ~19 en total, financia_a 1, contrato_a 3, fundo 2, sucedio_a 6, nombro_a 7); de ahí el conjunto prueba-dirigida opcional.
 
 Siempre:
