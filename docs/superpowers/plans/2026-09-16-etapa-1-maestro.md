@@ -616,9 +616,8 @@ git commit -m "Añade los cinco prompts del maestro construidos desde la guía d
 
 **Interfaces:**
 - `PRONOMBRES: frozenset[str]` (los de legajo: yo, tú, usted, él, ella, ellos, nosotros, me, mí, te, se, uno, otro, quien, alguien, nadie, todos, ambos y sus variantes).
-- `CIFRA = re.compile(r"\d|\b(mil|millón|millones|billón|billones|por ciento|%)\b", re.I)`.
 - `ETIQUETA_HABLANTE = re.compile(r"^[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ .]{1,40}:\s")`: si dos o más párrafos empiezan así, esos prefijos son hablantes de entrevista y las menciones dentro de ellos se descartan.
-- `filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencion], Counter]`: descarta montos sin cifra, personas que son pronombre, personas todo en minúscula sin `@`, menciones vacías o de más de 16 palabras, menciones dentro de etiqueta de hablante; devuelve las que quedan y el contador por motivo.
+- `filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencion], Counter]`: descarta personas que son pronombre, personas todo en minúscula sin `@`, menciones vacías o de más de 16 palabras, menciones dentro de etiqueta de hablante; devuelve las que quedan y el contador por motivo. (`monto` ya no es un tipo del esquema desde la corrección de tipos; el filtro de cifra que tenía se retira con él.)
 - `VIGENCIAS = frozenset({"vigente", "pasada", "futura"})`.
 - `filtrar_relaciones(relaciones: list[Relacion], grupos: dict[str, Grupo]) -> tuple[list[Relacion], Counter]`: descarta relación desconocida, extremos inexistentes, autorrelaciones, vigencia fuera de `VIGENCIAS`, tipos no admitidos (`admite`), atributo inválido (`clase_fina` lanza), duplicados y espejos de simétricas. Cuenta por motivo.
 
@@ -632,11 +631,10 @@ from enrel.maestro.filtros import filtrar_menciones, filtrar_relaciones
 def test_filtrar_menciones():
     texto = "Adriana Camacho: Yo creo que el presupuesto es alto.\n\nEntrevistador: ¿Cuánto?\n\nAdriana Camacho: 10 mil millones."
     ms = [Mencion("m1", 0, 15, "Adriana Camacho", "persona", ""), Mencion("m2", 17, 19, "Yo", "persona", ""),
-          Mencion("m3", 32, 43, "presupuesto", "monto", ""), Mencion("m4", 95, 110, "10 mil millones", "monto", ""),
           Mencion("m5", 80, 95, "Adriana Camacho", "persona", ""), Mencion("m6", 40, 44, "alto", "persona", "")]
     quedan, motivos = filtrar_menciones(texto, ms)
-    assert [m.id for m in quedan] == ["m4"]
-    assert motivos["hablante"] == 2 and motivos["pronombre"] == 1 and motivos["monto_sin_cifra"] == 1 and motivos["minuscula"] == 1
+    assert [m.id for m in quedan] == []
+    assert motivos["hablante"] == 2 and motivos["pronombre"] == 1 and motivos["minuscula"] == 1
 
 
 def test_filtrar_relaciones():
@@ -671,7 +669,6 @@ PRONOMBRES = frozenset({
     "me", "mí", "te", "ti", "se", "sí", "uno", "una", "otro", "otra", "otros", "otras", "quien", "quién",
     "alguien", "nadie", "cualquiera", "todos", "todas", "ambos", "ambas", "le", "les", "lo", "la",
 })
-CIFRA = re.compile(r"\d|\b(mil|millón|millones|billón|billones|por ciento|%)\b", re.I)
 ETIQUETA_HABLANTE = re.compile(r"^[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ .]{1,40}:\s", re.M)
 MAX_PALABRAS = 16
 VIGENCIAS = frozenset({"vigente", "pasada", "futura"})
@@ -696,9 +693,6 @@ def filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencio
             continue
         if any(h_ini <= m.ini and m.fin <= h_fin for h_ini, h_fin in hablantes):
             motivos["hablante"] += 1
-            continue
-        if m.tipo == "monto" and not CIFRA.search(t):
-            motivos["monto_sin_cifra"] += 1
             continue
         if m.tipo == "persona" and t.lower() in PRONOMBRES:
             motivos["pronombre"] += 1
@@ -920,7 +914,7 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
         vistos: set[tuple[int, int]] = set()
         for e in salida.get("entidades", []):
             tipo = e.get("tipo")
-            if tipo not in ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto"):
+            if tipo not in ("persona", "organizacion", "lugar", "cargo", "norma"):
                 cont["tipo_desconocido"] += 1
                 continue
             tramos = anclar_todas(texto, str(e.get("texto", "")))
@@ -1242,7 +1236,7 @@ git commit -m "Añade la puerta del maestro: criterios, errores frecuentes e inf
 - Test: `tests/test_linea_base_gliner.py` (marcado `gpu`, porque descarga 1 GB y es lento en CPU)
 
 **Interfaces:**
-- `ETIQUETAS_ENTIDAD: dict[str, str]` = tipo de enrel → etiqueta en lenguaje natural para GLiNER («persona con nombre propio», «nombre de organización, institución, empresa o partido», «nombre propio de lugar», «cargo público o título de un puesto», «nombre de ley, decreto, sentencia o norma jurídica», «título de libro, informe, periódico, revista o medio», «monto de dinero o cifra»), las mismas cadenas que legajo midió como mejores (redacción G).
+- `ETIQUETAS_ENTIDAD: dict[str, str]` = tipo de enrel → etiqueta en lenguaje natural para GLiNER («persona con nombre propio», «nombre de organización, institución, empresa o partido», «nombre propio de lugar», «cargo público o título de un puesto», «nombre de ley, decreto, sentencia o norma jurídica»), las mismas cadenas que legajo midió como mejores (redacción G); solo los cinco tipos del esquema (§3.1), sin obra ni monto.
 - `ETIQUETAS_RELACION: dict[str, str]` = relación gruesa → descripción corta en español (la primera frase de la definición de la guía).
 - `predecir_documento(extractor, doc: Documento) -> Documento`: corre el extractor sobre `doc.texto` en trozos de 380 palabras con solape de 40 (el modelo recibe 4.096 tokens, pero se trocea igual para la predicción de relaciones, que se degrada con pasajes densos), une menciones por offset, agrupa con `agrupar`, y convierte las relaciones a `Relacion` entre grupos (cabeza/cola por solape de menciones). `fuente="linea-base-gliner"`, `origen={"modelo": nombre, "umbral": 0.5}`.
 - Subcomando `enrel linea-base-gliner --oro datos/conjuntos/prueba.jsonl --salida datos/anotado/linea-base-gliner-prueba.jsonl [--modelo fastino/gliner2.5-multi-v1] [--umbral 0.5]`, y después `enrel evaluar` produce la tabla.
@@ -1290,8 +1284,6 @@ ETIQUETAS_ENTIDAD = {
     "lugar": "nombre propio de lugar",
     "cargo": "cargo público o título de un puesto",
     "norma": "nombre de ley, decreto, sentencia o norma jurídica",
-    "obra": "título de libro, informe, periódico, revista o medio",
-    "monto": "monto de dinero o cifra",
 }
 _TIPO_DE_ETIQUETA = {v: k for k, v in ETIQUETAS_ENTIDAD.items()}
 
