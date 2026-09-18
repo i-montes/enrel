@@ -400,8 +400,8 @@ git commit -m "Añade el anclaje de menciones y citas al texto en tres niveles"
 - `PROMPT_VERSION = "1.0"`.
 - `SISTEMA: str` (mensaje de sistema común).
 - `prompt_entidades(texto: str, guia) -> tuple[list[dict], dict]`: devuelve `(mensajes, esquema_json)`. El usuario recibe: tipos con «se marca / no se marca», convenciones, instrucciones de salida (`menciones literales`, `entidad` = identificador canónico por entidad, `tipo`), y el texto. Esquema JSON: `{"entidades": [{"texto": str, "tipo": enum TIPOS, "entidad": str}]}`.
-- `prompt_relaciones(texto: str, entidades: list[dict], familia: str, guia) -> tuple[list[dict], dict]`: `entidades` es la lista `[{"id": "e1", "canonico": "…", "tipo": "…", "menciones": ["…", …]}]`; el prompt lleva solo las relaciones de `FAMILIAS[familia]` con definición, tipos admitidos, atributos, tres ejemplos, «no es» y confusiones, más `vinculo_sin_tipo` como salida permitida; pide `{"relaciones": [{"cabeza": id, "cola": id, "relacion": enum, "atributo": str | null, "cita": str}]}` con la cita como subcadena literal del texto que afirma la relación.
-- `prompt_verificacion(texto: str, entidades: list[dict], relaciones: list[dict], guia) -> tuple[list[dict], dict]`: lista numerada de relaciones con canónicos y cita; pide por cada una `{"indice": int, "veredicto": "confirmada" | "rechazada" | "corregida", "relacion": enum | null, "atributo": str | null, "motivo": str}`.
+- `prompt_relaciones(texto: str, entidades: list[dict], familia: str, guia, fecha: str) -> tuple[list[dict], dict]`: `entidades` es la lista `[{"id": "e1", "canonico": "…", "tipo": "…", "menciones": ["…", …]}]`; el prompt lleva solo las relaciones de `FAMILIAS[familia]` con definición, tipos admitidos, atributos, tres ejemplos, «no es» y confusiones, más `vinculo_sin_tipo` como salida permitida, más un bloque de vigencia que explica los tres valores (vigente, pasada, futura) relativos a `fecha` y las marcas del texto que los señalan; pide `{"relaciones": [{"cabeza": id, "cola": id, "relacion": enum, "atributo": str | null, "vigencia": "vigente" | "pasada" | "futura", "cita": str}]}` con la cita como subcadena literal del texto que afirma la relación.
+- `prompt_verificacion(texto: str, entidades: list[dict], relaciones: list[dict], guia, fecha: str) -> tuple[list[dict], dict]`: lista numerada de relaciones con canónicos, vigencia y cita; pide por cada una `{"indice": int, "veredicto": "confirmada" | "rechazada" | "corregida", "relacion": enum | null, "atributo": str | null, "vigencia": "vigente" | "pasada" | "futura" | null, "motivo": str}`.
 - `enumerar_clases(familia) -> list[str]` para los `enum` del esquema JSON.
 
 - [ ] **Paso 1: Tests**
@@ -431,7 +431,7 @@ def test_prompt_entidades_lleva_tipos_y_no_pide_offsets():
 def test_prompt_relaciones_solo_su_familia():
     ents = [{"id": "e1", "canonico": "Gustavo Petro", "tipo": "persona", "menciones": ["Gustavo Petro"]},
             {"id": "e2", "canonico": "Luis Carlos Reyes", "tipo": "persona", "menciones": ["Luis Carlos Reyes"]}]
-    mensajes, esquema = pr.prompt_relaciones(T, ents, "A", GUIA)
+    mensajes, esquema = pr.prompt_relaciones(T, ents, "A", GUIA, "2024-05-01")
     cuerpo = mensajes[-1]["content"]
     for r in FAMILIAS["A"]:
         assert f"### {r}" in cuerpo
@@ -440,16 +440,20 @@ def test_prompt_relaciones_solo_su_familia():
     assert "e1" in cuerpo and "Gustavo Petro" in cuerpo
     assert set(esquema["properties"]["relaciones"]["items"]["properties"]["relacion"]["enum"]) == set(FAMILIAS["A"]) | {SIN_TIPO}
     assert "Ejemplos" in cuerpo and "No es" in cuerpo and "cita" in cuerpo
+    assert "2024-05-01" in cuerpo and "VIGENCIA" in cuerpo
+    assert esquema["properties"]["relaciones"]["items"]["properties"]["vigencia"]["enum"] == ["vigente", "pasada", "futura"]
 
 
 def test_prompt_verificacion():
     ents = [{"id": "e1", "canonico": "Gustavo Petro", "tipo": "persona", "menciones": []},
             {"id": "e2", "canonico": "Luis Carlos Reyes", "tipo": "persona", "menciones": []}]
-    rels = [{"cabeza": "e1", "cola": "e2", "relacion": "nombro_a", "atributo": None, "cita": "Gustavo Petro nombró a Luis Carlos Reyes"}]
-    mensajes, esquema = pr.prompt_verificacion(T, ents, rels, GUIA)
+    rels = [{"cabeza": "e1", "cola": "e2", "relacion": "nombro_a", "atributo": None, "vigencia": "vigente",
+             "cita": "Gustavo Petro nombró a Luis Carlos Reyes"}]
+    mensajes, esquema = pr.prompt_verificacion(T, ents, rels, GUIA, "2024-05-01")
     cuerpo = mensajes[-1]["content"]
     assert "1. Gustavo Petro —nombro_a→ Luis Carlos Reyes" in cuerpo
     assert esquema["properties"]["veredictos"]["items"]["properties"]["veredicto"]["enum"] == ["confirmada", "rechazada", "corregida"]
+    assert "vigencia" in esquema["properties"]["veredictos"]["items"]["properties"]
 ```
 
 - [ ] **Paso 2: Ejecutar y ver que falla** → `ModuleNotFoundError`.
@@ -526,16 +530,30 @@ def prompt_entidades(texto: str, guia) -> tuple[list[dict], dict]:
     return [{"role": "system", "content": SISTEMA}, {"role": "user", "content": cuerpo}], esquema
 
 
-def prompt_relaciones(texto: str, entidades: list[dict], familia: str, guia) -> tuple[list[dict], dict]:
+def _bloque_vigencia(fecha: str) -> str:
+    return (
+        f"VIGENCIA (relativa a la fecha del artículo, {fecha}; no a cuándo lees esto):\n"
+        "- vigente (por defecto): el texto habla en presente o no marca fin.\n"
+        "- pasada: con «ex», «fue», «entonces», «hasta», «exministro» y marcas similares de que ya terminó.\n"
+        "- futura: con lo anunciado («asumirá», «será»).\n"
+        "- No confundir con la modalidad de ocupa_cargo (titular/aspirante, en sus Atributos arriba): aspirar es una "
+        "modalidad, no un tiempo; un aspirante puede estarlo vigente (aspira hoy) o pasada (aspiró y ya no).\n"
+        "- En nombro_a, sucedio_a, fundo, contrato_a y financia_a (son sucesos, no estados) casi siempre es vigente."
+    )
+
+
+def prompt_relaciones(texto: str, entidades: list[dict], familia: str, guia, fecha: str) -> tuple[list[dict], dict]:
     clases = enumerar_clases(familia)
     cuerpo = (
         f"RELACIONES A BUSCAR (solo estas {len(clases)}; si el texto afirma un vínculo que no encaja en ninguna, usa {SIN_TIPO}):\n\n" +
         "\n\n".join(_bloque_relacion(r, guia) for r in clases) +
         "\n\nCONVENCIONES:\n" + _bloque_convenciones(guia) +
+        "\n\n" + _bloque_vigencia(fecha) +
         "\n\nENTIDADES YA IDENTIFICADAS (usa sus identificadores):\n" + _bloque_entidades(entidades) +
         "\n\nINSTRUCCIONES DE SALIDA:\n"
         "- Una relación por cada par de entidades que el texto afirme con alguna de las relaciones de arriba, en la dirección que la definición indica.\n"
         "- «atributo» solo para las relaciones que lo tienen; en las demás, null.\n"
+        "- «vigencia»: vigente, pasada o futura, según el bloque de arriba; por defecto vigente.\n"
         "- «cita»: la frase o fragmento del texto, copiado literalmente, que afirma la relación.\n"
         "- No inventes relaciones por coocurrencia ni por conocimiento externo. Si no hay ninguna, devuelve la lista vacía.\n\n"
         f"TEXTO:\n«{texto}»"
@@ -543,24 +561,27 @@ def prompt_relaciones(texto: str, entidades: list[dict], familia: str, guia) -> 
     esquema = {"type": "object", "properties": {"relaciones": {"type": "array", "items": {
         "type": "object", "properties": {"cabeza": {"type": "string"}, "cola": {"type": "string"},
                                          "relacion": {"type": "string", "enum": clases},
-                                         "atributo": {"type": ["string", "null"]}, "cita": {"type": "string"}},
-        "required": ["cabeza", "cola", "relacion", "atributo", "cita"], "additionalProperties": False}}},
+                                         "atributo": {"type": ["string", "null"]},
+                                         "vigencia": {"type": "string", "enum": ["vigente", "pasada", "futura"]},
+                                         "cita": {"type": "string"}},
+        "required": ["cabeza", "cola", "relacion", "atributo", "vigencia", "cita"], "additionalProperties": False}}},
         "required": ["relaciones"], "additionalProperties": False}
     return [{"role": "system", "content": SISTEMA}, {"role": "user", "content": cuerpo}], esquema
 
 
-def prompt_verificacion(texto: str, entidades: list[dict], relaciones: list[dict], guia) -> tuple[list[dict], dict]:
+def prompt_verificacion(texto: str, entidades: list[dict], relaciones: list[dict], guia, fecha: str) -> tuple[list[dict], dict]:
     canon = {e["id"]: e["canonico"] for e in entidades}
     lista = "\n".join(
         f"{i + 1}. {canon.get(r['cabeza'], r['cabeza'])} —{r['relacion']}{(':' + r['atributo']) if r.get('atributo') else ''}→ "
-        f"{canon.get(r['cola'], r['cola'])} · cita: «{r.get('cita', '')}»"
+        f"{canon.get(r['cola'], r['cola'])} · vigencia: {r.get('vigencia', 'vigente')} · cita: «{r.get('cita', '')}»"
         for i, r in enumerate(relaciones))
     _, defs, _ = guia
     definiciones = "\n".join(f"- {n}: {defs[n].definicion}" for n in list(RELACIONES) + [SIN_TIPO])
     cuerpo = (
-        "Verifica cada relación propuesta contra el texto. Para cada una responde «confirmada» si el texto afirma exactamente esa relación entre esas dos "
-        "entidades, en esa dirección y con ese atributo; «rechazada» si el texto no la afirma (coocurrencia, inferencia, dirección invertida sin arreglo posible, "
-        "entidades equivocadas); «corregida» si el vínculo existe pero la relación o el atributo correctos son otros, e indica cuáles.\n\n"
+        "Verifica cada relación propuesta contra el texto, incluida su vigencia. Para cada una responde «confirmada» si el texto afirma exactamente esa "
+        "relación entre esas dos entidades, en esa dirección, con ese atributo y con esa vigencia (vigente, pasada o futura, relativa a la fecha del "
+        f"artículo, {fecha}); «rechazada» si el texto no la afirma (coocurrencia, inferencia, dirección invertida sin arreglo posible, "
+        "entidades equivocadas); «corregida» si el vínculo existe pero la relación, el atributo o la vigencia correctos son otros, e indica cuáles.\n\n"
         "DEFINICIONES BREVES:\n" + definiciones +
         "\n\nRELACIONES PROPUESTAS:\n" + lista +
         f"\n\nTEXTO:\n«{texto}»"
@@ -569,8 +590,9 @@ def prompt_verificacion(texto: str, entidades: list[dict], relaciones: list[dict
         "type": "object", "properties": {"indice": {"type": "integer"},
                                          "veredicto": {"type": "string", "enum": ["confirmada", "rechazada", "corregida"]},
                                          "relacion": {"type": ["string", "null"]}, "atributo": {"type": ["string", "null"]},
+                                         "vigencia": {"type": ["string", "null"], "enum": ["vigente", "pasada", "futura", None]},
                                          "motivo": {"type": "string"}},
-        "required": ["indice", "veredicto", "relacion", "atributo", "motivo"], "additionalProperties": False}}},
+        "required": ["indice", "veredicto", "relacion", "atributo", "vigencia", "motivo"], "additionalProperties": False}}},
         "required": ["veredictos"], "additionalProperties": False}
     return [{"role": "system", "content": SISTEMA}, {"role": "user", "content": cuerpo}], esquema
 ```
@@ -594,10 +616,10 @@ git commit -m "Añade los cinco prompts del maestro construidos desde la guía d
 
 **Interfaces:**
 - `PRONOMBRES: frozenset[str]` (los de legajo: yo, tú, usted, él, ella, ellos, nosotros, me, mí, te, se, uno, otro, quien, alguien, nadie, todos, ambos y sus variantes).
-- `CIFRA = re.compile(r"\d|\b(mil|millón|millones|billón|billones|por ciento|%)\b", re.I)`.
 - `ETIQUETA_HABLANTE = re.compile(r"^[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ .]{1,40}:\s")`: si dos o más párrafos empiezan así, esos prefijos son hablantes de entrevista y las menciones dentro de ellos se descartan.
-- `filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencion], Counter]`: descarta montos sin cifra, personas que son pronombre, personas todo en minúscula sin `@`, menciones vacías o de más de 16 palabras, menciones dentro de etiqueta de hablante; devuelve las que quedan y el contador por motivo.
-- `filtrar_relaciones(relaciones: list[Relacion], grupos: dict[str, Grupo]) -> tuple[list[Relacion], Counter]`: descarta relación desconocida, extremos inexistentes, autorrelaciones, tipos no admitidos (`admite`), atributo inválido (`clase_fina` lanza), duplicados y espejos de simétricas. Cuenta por motivo.
+- `filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencion], Counter]`: descarta personas que son pronombre, personas todo en minúscula sin `@`, menciones vacías o de más de 16 palabras, menciones dentro de etiqueta de hablante; devuelve las que quedan y el contador por motivo. (`monto` ya no es un tipo del esquema desde la corrección de tipos; el filtro de cifra que tenía se retira con él.)
+- `VIGENCIAS = frozenset({"vigente", "pasada", "futura"})`.
+- `filtrar_relaciones(relaciones: list[Relacion], grupos: dict[str, Grupo]) -> tuple[list[Relacion], Counter]`: descarta relación desconocida, extremos inexistentes, autorrelaciones, vigencia fuera de `VIGENCIAS`, tipos no admitidos (`admite`), atributo inválido (`clase_fina` lanza), duplicados y espejos de simétricas. Cuenta por motivo.
 
 - [ ] **Paso 1: Tests**
 
@@ -609,22 +631,24 @@ from enrel.maestro.filtros import filtrar_menciones, filtrar_relaciones
 def test_filtrar_menciones():
     texto = "Adriana Camacho: Yo creo que el presupuesto es alto.\n\nEntrevistador: ¿Cuánto?\n\nAdriana Camacho: 10 mil millones."
     ms = [Mencion("m1", 0, 15, "Adriana Camacho", "persona", ""), Mencion("m2", 17, 19, "Yo", "persona", ""),
-          Mencion("m3", 32, 43, "presupuesto", "monto", ""), Mencion("m4", 95, 110, "10 mil millones", "monto", ""),
           Mencion("m5", 80, 95, "Adriana Camacho", "persona", ""), Mencion("m6", 40, 44, "alto", "persona", "")]
     quedan, motivos = filtrar_menciones(texto, ms)
-    assert [m.id for m in quedan] == ["m4"]
-    assert motivos["hablante"] == 2 and motivos["pronombre"] == 1 and motivos["monto_sin_cifra"] == 1 and motivos["minuscula"] == 1
+    assert [m.id for m in quedan] == []
+    assert motivos["hablante"] == 2 and motivos["pronombre"] == 1 and motivos["minuscula"] == 1
 
 
 def test_filtrar_relaciones():
     grupos = {"e1": Grupo("e1", "persona", "A"), "e2": Grupo("e2", "persona", "B"), "e3": Grupo("e3", "lugar", "C")}
     rels = [Relacion("e1", "e2", "socio_de"), Relacion("e2", "e1", "socio_de"), Relacion("e1", "e1", "nombro_a"),
-            Relacion("e1", "e3", "ocupa_cargo", "actual"), Relacion("e1", "e2", "ocupa_cargo", "x"),
-            Relacion("e1", "e9", "nombro_a"), Relacion("e1", "e2", "es_amigo_de"), Relacion("e1", "e2", "nombro_a"), Relacion("e1", "e2", "nombro_a")]
+            Relacion("e1", "e3", "familiar_de", "hijo_de"), Relacion("e1", "e2", "ocupa_cargo", "x"),
+            Relacion("e1", "e9", "nombro_a"), Relacion("e1", "e2", "es_amigo_de"),
+            Relacion("e1", "e2", "nombro_a", vigencia="ayer"),
+            Relacion("e1", "e2", "nombro_a"), Relacion("e1", "e2", "nombro_a")]
     quedan, motivos = filtrar_relaciones(rels, grupos)
     assert [(r.cabeza, r.cola, r.relacion) for r in quedan] == [("e1", "e2", "socio_de"), ("e1", "e2", "nombro_a")]
     assert motivos["espejo"] == 1 and motivos["autorrelacion"] == 1 and motivos["tipos_no_admitidos"] == 1
     assert motivos["atributo_invalido"] == 1 and motivos["extremo_inexistente"] == 1 and motivos["relacion_desconocida"] == 1 and motivos["duplicada"] == 1
+    assert motivos["vigencia_invalida"] == 1
 ```
 
 - [ ] **Paso 2: Ejecutar y ver que falla** → `ModuleNotFoundError`.
@@ -645,9 +669,9 @@ PRONOMBRES = frozenset({
     "me", "mí", "te", "ti", "se", "sí", "uno", "una", "otro", "otra", "otros", "otras", "quien", "quién",
     "alguien", "nadie", "cualquiera", "todos", "todas", "ambos", "ambas", "le", "les", "lo", "la",
 })
-CIFRA = re.compile(r"\d|\b(mil|millón|millones|billón|billones|por ciento|%)\b", re.I)
 ETIQUETA_HABLANTE = re.compile(r"^[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ .]{1,40}:\s", re.M)
 MAX_PALABRAS = 16
+VIGENCIAS = frozenset({"vigente", "pasada", "futura"})
 
 
 def _tramos_hablante(texto: str) -> list[tuple[int, int]]:
@@ -669,9 +693,6 @@ def filtrar_menciones(texto: str, menciones: list[Mencion]) -> tuple[list[Mencio
             continue
         if any(h_ini <= m.ini and m.fin <= h_fin for h_ini, h_fin in hablantes):
             motivos["hablante"] += 1
-            continue
-        if m.tipo == "monto" and not CIFRA.search(t):
-            motivos["monto_sin_cifra"] += 1
             continue
         if m.tipo == "persona" and t.lower() in PRONOMBRES:
             motivos["pronombre"] += 1
@@ -695,6 +716,9 @@ def filtrar_relaciones(relaciones: list[Relacion], grupos: dict[str, Grupo]) -> 
             continue
         if r.cabeza == r.cola:
             motivos["autorrelacion"] += 1
+            continue
+        if r.vigencia not in VIGENCIAS:
+            motivos["vigencia_invalida"] += 1
             continue
         try:
             fina = clase_fina(r.relacion, r.atributo)
@@ -740,9 +764,9 @@ git commit -m "Añade los filtros de menciones y relaciones a la salida del maes
   2. Por cada entrada: `anclar_todas(texto, e["texto"])` → una `Mencion` por aparición, tipo `e["tipo"]`, `grupo` provisional = `e["entidad"]`; cuenta `no_localizadas`. Se aplica `recortar_articulo` salvo que el texto recortado deje de coincidir con la mención.
   3. `filtrar_menciones`. Después `agrupar(menciones)` por reglas; el identificador canónico del maestro se usa para **unir** grupos que las reglas separaron pero el maestro juntó (misma `entidad`, mismo tipo): unión, no partición. Se cuenta `uniones_maestro`.
   4. Entidades para el prompt: `[{"id": g.id, "canonico": g.canonico, "tipo": g.tipo, "menciones": [textos únicos]}]`.
-  5. Tres llamadas `relaciones_A/B/C` → `Relacion(cabeza, cola, relacion, atributo, evidencia)` con `evidencia = localizar(texto, cita)` (None si no ancla; se cuenta `citas_no_ancladas` pero la relación sigue hasta la verificación).
+  5. Tres llamadas `relaciones_A/B/C`, pasando la `fecha` del artículo, → `Relacion(cabeza, cola, relacion, atributo, evidencia, vigencia)` con `evidencia = localizar(texto, cita)` (None si no ancla; se cuenta `citas_no_ancladas` pero la relación sigue hasta la verificación) y `vigencia` tomada de la salida del maestro (por defecto `vigente` si falta).
   6. `filtrar_relaciones` sobre la unión de las tres.
-  7. Llamada `verificacion` con todas; se conservan `confirmada` y `corregida` (con la relación/atributo corregidos, revalidados con `admite` y `clase_fina`); las `rechazada` se cuentan por relación en `origen["rechazadas"]`.
+  7. Llamada `verificacion` con todas, incluida su vigencia y la `fecha`; se conservan `confirmada` y `corregida` (con la relación, el atributo o la vigencia corregidos, revalidados con `admite` y `clase_fina`); las `rechazada` se cuentan por relación en `origen["rechazadas"]`.
   8. `filtrar_relaciones` otra vez (las corregidas pueden duplicar). Documento con `fuente="plata"`, `origen = {"maestro": cliente.modelo, "prompt": PROMPT_VERSION, "tokens_entrada", "tokens_salida", "segundos", "no_localizadas", "citas_no_ancladas", "uniones_maestro", "motivos_menciones", "motivos_relaciones", "rechazadas", "invalido"}`. `validar_documento` debe devolver vacío; si no, lanza.
   9. Si `crudo_dir`, guarda cada respuesta cruda en `crudo_dir/<doc_id sin ':'>/<llamada>.json` con `{"mensajes", "esquema", "texto", "tokens", "segundos", "prompt": PROMPT_VERSION}`.
 - `anotar_lote(cliente, corpus: Path, seleccion: Path, conjunto: str, salida: Path, guia, hilos: int = 4, crudo_dir: Path = Path("datos/maestro/crudo"), limite: int | None = None) -> dict`: lee el corpus congelado a un índice `doc_id → fila`, toma los `doc_id` de `seleccion` con `conjunto` dado, salta los ya presentes en `salida` (reanudable), anota en paralelo con `ThreadPoolExecutor(hilos)`, añade cada documento a `salida` al terminar (una línea, `flush`), y devuelve un resumen (documentos, fallos, tokens, segundos de pared, suma de contadores). Los fallos (excepción por documento) se registran en `salida.with_suffix(".fallos.jsonl")` con el `doc_id` y el error, y no detienen el lote.
@@ -785,22 +809,25 @@ class ClienteFalso:
                 {"texto": "empresario", "tipo": "cargo", "entidad": "empresario"},
                 {"texto": "él", "tipo": "persona", "entidad": "él"}]}
         elif "RELACIONES A BUSCAR" in cuerpo and "### fundo" in cuerpo:
-            salida = {"relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "fundo", "atributo": None,
+            salida = {"relaciones": [{"cabeza": "e1", "cola": "e2", "relacion": "fundo", "atributo": None, "vigencia": "vigente",
                                        "cita": "Álvaro Uribe fundó el Centro Democrático"}]}
         elif "RELACIONES A BUSCAR" in cuerpo and "### familiar_de" in cuerpo:
             salida = {"relaciones": [
-                {"cabeza": "e1", "cola": "e3", "relacion": "familiar_de", "atributo": "hijo_de", "cita": "Tomás Uribe, hijo de Álvaro Uribe"},
-                {"cabeza": "e1", "cola": "e4", "relacion": "vinculo_sin_tipo", "atributo": None, "cita": "Uribe se reunió con Petro"},
-                {"cabeza": "e1", "cola": "e4", "relacion": "apoya_a", "atributo": None, "cita": "Uribe se reunió con Petro"}]}
+                {"cabeza": "e1", "cola": "e3", "relacion": "familiar_de", "atributo": "hijo_de", "vigencia": "vigente",
+                 "cita": "Tomás Uribe, hijo de Álvaro Uribe"},
+                {"cabeza": "e1", "cola": "e4", "relacion": "vinculo_sin_tipo", "atributo": None, "vigencia": "vigente",
+                 "cita": "Uribe se reunió con Petro"},
+                {"cabeza": "e1", "cola": "e4", "relacion": "apoya_a", "atributo": None, "vigencia": "vigente",
+                 "cita": "Uribe se reunió con Petro"}]}
         elif "RELACIONES A BUSCAR" in cuerpo:
             salida = {"relaciones": []}
         elif "Verifica cada relación" in cuerpo:
             # 1 fundo confirmada; 2 hijo_de invertida → corregida (la cabeza debe ser Tomás); 3 sin tipo confirmada; 4 apoya_a rechazada
             salida = {"veredictos": [
-                {"indice": 1, "veredicto": "confirmada", "relacion": None, "atributo": None, "motivo": ""},
-                {"indice": 2, "veredicto": "rechazada", "relacion": None, "atributo": None, "motivo": "dirección invertida"},
-                {"indice": 3, "veredicto": "confirmada", "relacion": None, "atributo": None, "motivo": ""},
-                {"indice": 4, "veredicto": "rechazada", "relacion": None, "atributo": None, "motivo": "no afirma apoyo"}]}
+                {"indice": 1, "veredicto": "confirmada", "relacion": None, "atributo": None, "vigencia": None, "motivo": ""},
+                {"indice": 2, "veredicto": "rechazada", "relacion": None, "atributo": None, "vigencia": None, "motivo": "dirección invertida"},
+                {"indice": 3, "veredicto": "confirmada", "relacion": None, "atributo": None, "vigencia": None, "motivo": ""},
+                {"indice": 4, "veredicto": "rechazada", "relacion": None, "atributo": None, "vigencia": None, "motivo": "no afirma apoyo"}]}
         else:
             raise AssertionError(cuerpo[:80])
         return Respuesta(json.dumps(salida, ensure_ascii=False), 10, 5, 0.1, False, "falso")
@@ -817,6 +844,7 @@ def test_anotar_documento(tmp_path):
     assert len(uribes) == 1
     finas = {d.clase_fina_de(r) for r in d.relaciones}
     assert finas == {"fundo", "vinculo_sin_tipo"}
+    assert all(r.vigencia == "vigente" for r in d.relaciones)
     assert d.origen["rechazadas"] == {"familiar_de:hijo_de": 1, "apoya_a": 1}
     assert d.origen["prompt"] == "1.0" and d.fuente == "plata"
     assert (tmp_path / "wp_1" / "verificacion.json").exists()
@@ -886,7 +914,7 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
         vistos: set[tuple[int, int]] = set()
         for e in salida.get("entidades", []):
             tipo = e.get("tipo")
-            if tipo not in ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto"):
+            if tipo not in ("persona", "organizacion", "lugar", "cargo", "norma"):
                 cont["tipo_desconocido"] += 1
                 continue
             tramos = anclar_todas(texto, str(e.get("texto", "")))
@@ -925,9 +953,10 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
     # 4-5. Relaciones por familia.
     relaciones: list[Relacion] = []
     citas: dict[int, str] = {}
+    fecha = meta.get("fecha", "")
     if len(grupos) >= 2:
         for familia in FAMILIAS:
-            mensajes, esquema = prompts.prompt_relaciones(texto, entidades_prompt, familia, guia)
+            mensajes, esquema = prompts.prompt_relaciones(texto, entidades_prompt, familia, guia, fecha)
             salida = _llamar(cliente, mensajes, esquema, cont, f"relaciones_{familia}", crudo_dir, doc_id)
             if salida is None:
                 cont["relaciones_invalidas"] += 1
@@ -937,7 +966,8 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
                 ev = localizar(texto, cita) if cita else None
                 if cita and ev is None:
                     cont["citas_no_ancladas"] += 1
-                rel = Relacion(str(r.get("cabeza", "")), str(r.get("cola", "")), str(r.get("relacion", "")), r.get("atributo"), ev)
+                rel = Relacion(str(r.get("cabeza", "")), str(r.get("cola", "")), str(r.get("relacion", "")), r.get("atributo"), ev,
+                              vigencia=r.get("vigencia") or "vigente")
                 citas[id(rel)] = cita
                 relaciones.append(rel)
     relaciones, motivos_r = filtrar_relaciones(relaciones, por_id)
@@ -945,9 +975,9 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
     # 6-7. Verificación.
     rechazadas: Counter = Counter()
     if relaciones:
-        lista = [{"cabeza": r.cabeza, "cola": r.cola, "relacion": r.relacion, "atributo": r.atributo, "cita": citas.get(id(r), "")}
-                 for r in relaciones]
-        mensajes, esquema = prompts.prompt_verificacion(texto, entidades_prompt, lista, guia)
+        lista = [{"cabeza": r.cabeza, "cola": r.cola, "relacion": r.relacion, "atributo": r.atributo, "vigencia": r.vigencia,
+                  "cita": citas.get(id(r), "")} for r in relaciones]
+        mensajes, esquema = prompts.prompt_verificacion(texto, entidades_prompt, lista, guia, fecha)
         salida = _llamar(cliente, mensajes, esquema, cont, "verificacion", crudo_dir, doc_id)
         if salida is None:
             cont["verificacion_invalida"] += 1
@@ -959,7 +989,8 @@ def anotar_documento(cliente: Cliente, texto: str, meta: dict, guia, crudo_dir: 
                 if v is None or v.get("veredicto") == "confirmada":
                     finales.append(r)
                 elif v.get("veredicto") == "corregida" and v.get("relacion") in RELACIONES_Y_SIN_TIPO:
-                    nueva = Relacion(r.cabeza, r.cola, v["relacion"], v.get("atributo"), r.evidencia)
+                    nueva = Relacion(r.cabeza, r.cola, v["relacion"], v.get("atributo"), r.evidencia,
+                                     vigencia=v.get("vigencia") or r.vigencia)
                     try:
                         clase_fina(nueva.relacion, nueva.atributo)
                         if admite(nueva.relacion, por_id[r.cabeza].tipo, por_id[r.cola].tipo):
@@ -1062,7 +1093,7 @@ git commit -m "Añade la anotación por documento en cinco llamadas y el lote re
 
 **Interfaces:**
 - `CRITERIOS = {"entidades_estricto": 0.90, "re_mas": 0.75, "direccion": 0.95}`.
-- `medir(oro: list[Documento], pred: list[Documento]) -> dict`: `{"entidades_estricto": f1, "entidades_parcial": f1, "re": f1, "re_mas": f1, "fina": f1, "direccion": tasa, "pasa": bool, "por_relacion": {nombre: PRF}}` usando `evaluar_entidades` y `evaluar_relaciones`.
+- `medir(oro: list[Documento], pred: list[Documento]) -> dict`: `{"entidades_estricto": f1, "entidades_parcial": f1, "re": f1, "re_mas": f1, "fina": f1, "direccion": tasa, "vigencia": tasa, "vigencia_n": int, "pasa": bool, "por_relacion": {nombre: PRF}}` usando `evaluar_entidades` y `evaluar_relaciones`. `vigencia` es solo informativa (no entra en `pasa`): la tasa de acierto de vigencia sobre las relaciones donde ya acertaron par y relación gruesa.
 - `errores_frecuentes(oro, pred, n: int = 30) -> list[dict]`: los falsos negativos y falsos positivos de relaciones gruesas agrupados por `(relacion, tipo_error)` con conteo y hasta 3 ejemplos cada uno (`doc_id`, canónicos, y 120 caracteres del texto alrededor de la evidencia del oro o de la predicción). Ordenados por conteo.
 - `informe_puerta(oro, pred, iteracion: int, nota: str) -> str`: markdown con fecha, `PROMPT_VERSION`, modelo, número de documentos, la tabla de criterios (valor, umbral, pasa), el `informe_completo` de la etapa 0, y la lista de errores frecuentes.
 - Subcomando `enrel puerta --oro datos/conjuntos/prueba.jsonl [--pred datos/anotado/maestro-prueba.jsonl] [--iteracion N] [--nota "…"] [--salida docs/maestro/puerta-<fecha>-<N>.md]`: si no se pasa `--pred`, anota la prueba con el maestro (`anotar_textos`) y la guarda en `datos/anotado/maestro-prueba-v<PROMPT_VERSION>.jsonl` antes de medir. Sale con código 0 si pasa, 1 si no.
@@ -1076,11 +1107,12 @@ from tests.test_eval_relaciones import ORO, pred
 
 
 def test_medir_pasa_y_no_pasa():
-    perfecto = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo", "actual"), Relacion("p1", "p2", "socio_de")])
+    perfecto = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo", "titular"), Relacion("p1", "p2", "socio_de")])
     m = medir([ORO], [perfecto])
     assert m["re_mas"] == 1.0 and m["direccion"] == 1.0 and m["entidades_estricto"] < 1.0  # falta Colombia en la predicción
     assert not m["pasa"]  # entidades 3/4 = 0.86 < 0.90
     assert set(CRITERIOS) == {"entidades_estricto", "re_mas", "direccion"}
+    assert "vigencia" in m and "vigencia" not in CRITERIOS  # informativa, no criterio
 
 
 def test_errores_frecuentes():
@@ -1119,8 +1151,13 @@ def medir(oro: list[Documento], pred: list[Documento]) -> dict:
     fina = evaluar_relaciones(oro, pred, "fina", exigir_tipos=True)["__micro__"].f1
     d = re_mas["__direccion__"]
     direccion = d.tp / (d.tp + d.fn) if d.tp + d.fn else 1.0
+    # Vigencia: eje aparte, no entra en la condición de acierto de RE ni de RE+; solo se informa (§8 de la spec).
+    vig = re_mas["__vigencia__"]
+    vigencia_n = vig.tp + vig.fn
+    vigencia = vig.tp / vigencia_n if vigencia_n else 1.0
     valores = {"entidades_estricto": ent_e, "entidades_parcial": ent_p, "re": re["__micro__"].f1,
-               "re_mas": re_mas["__micro__"].f1, "fina": fina, "direccion": direccion}
+               "re_mas": re_mas["__micro__"].f1, "fina": fina, "direccion": direccion,
+               "vigencia": vigencia, "vigencia_n": vigencia_n}
     valores["pasa"] = all(valores[k] >= v for k, v in CRITERIOS.items())
     valores["por_relacion"] = {k: v for k, v in re_mas.items() if not k.startswith("__")}
     return valores
@@ -1168,6 +1205,7 @@ def informe_puerta(oro: list[Documento], pred: list[Documento], iteracion: int, 
     for k, umbral in CRITERIOS.items():
         lineas.append(f"| {k} | {m[k]:.3f} | {umbral:.2f} | {'sí' if m[k] >= umbral else 'no'} |")
     lineas += [f"| entidades_parcial | {m['entidades_parcial']:.3f} | — | |", f"| re | {m['re']:.3f} | — | |", f"| fina | {m['fina']:.3f} | — | |",
+               f"| vigencia (tasa = R, n={m['vigencia_n']}) | {m['vigencia']:.3f} | — | |",
                "", f"**Resultado: {'PASA' if m['pasa'] else 'NO PASA'}.**", "", "## Errores más frecuentes", ""]
     for e in errores_frecuentes(oro, pred):
         lineas.append(f"- **{e['relacion']} · {e['tipo_error']} · {e['conteo']}**")
@@ -1198,7 +1236,7 @@ git commit -m "Añade la puerta del maestro: criterios, errores frecuentes e inf
 - Test: `tests/test_linea_base_gliner.py` (marcado `gpu`, porque descarga 1 GB y es lento en CPU)
 
 **Interfaces:**
-- `ETIQUETAS_ENTIDAD: dict[str, str]` = tipo de enrel → etiqueta en lenguaje natural para GLiNER («persona con nombre propio», «nombre de organización, institución, empresa o partido», «nombre propio de lugar», «cargo público o título de un puesto», «nombre de ley, decreto, sentencia o norma jurídica», «título de libro, informe, periódico, revista o medio», «monto de dinero o cifra»), las mismas cadenas que legajo midió como mejores (redacción G).
+- `ETIQUETAS_ENTIDAD: dict[str, str]` = tipo de enrel → etiqueta en lenguaje natural para GLiNER («persona con nombre propio», «nombre de organización, institución, empresa o partido», «nombre propio de lugar», «cargo público o título de un puesto», «nombre de ley, decreto, sentencia o norma jurídica»), las mismas cadenas que legajo midió como mejores (redacción G); solo los cinco tipos del esquema (§3.1), sin obra ni monto.
 - `ETIQUETAS_RELACION: dict[str, str]` = relación gruesa → descripción corta en español (la primera frase de la definición de la guía).
 - `predecir_documento(extractor, doc: Documento) -> Documento`: corre el extractor sobre `doc.texto` en trozos de 380 palabras con solape de 40 (el modelo recibe 4.096 tokens, pero se trocea igual para la predicción de relaciones, que se degrada con pasajes densos), une menciones por offset, agrupa con `agrupar`, y convierte las relaciones a `Relacion` entre grupos (cabeza/cola por solape de menciones). `fuente="linea-base-gliner"`, `origen={"modelo": nombre, "umbral": 0.5}`.
 - Subcomando `enrel linea-base-gliner --oro datos/conjuntos/prueba.jsonl --salida datos/anotado/linea-base-gliner-prueba.jsonl [--modelo fastino/gliner2.5-multi-v1] [--umbral 0.5]`, y después `enrel evaluar` produce la tabla.
@@ -1246,8 +1284,6 @@ ETIQUETAS_ENTIDAD = {
     "lugar": "nombre propio de lugar",
     "cargo": "cargo público o título de un puesto",
     "norma": "nombre de ley, decreto, sentencia o norma jurídica",
-    "obra": "título de libro, informe, periódico, revista o medio",
-    "monto": "monto de dinero o cifra",
 }
 _TIPO_DE_ETIQUETA = {v: k for k, v in ETIQUETAS_ENTIDAD.items()}
 
@@ -1319,7 +1355,7 @@ def predecir_documento(extractor, doc: Documento, umbral: float = 0.5, nombre: s
                      "linea-base-gliner", {"modelo": nombre, "umbral": umbral})
 ```
 
-Nota: GLiNER no predice atributos; se asigna el primer atributo de la relación (p. ej. `ocupa_cargo:actual`) y la evaluación fina lo penalizará. Es la línea base; se documenta.
+Nota: GLiNER no predice atributos; se asigna el primer atributo de la relación cuando la relación tiene atributos (p. ej. `familiar_de` → `conyuge`, `ocupa_cargo` → `titular`), y ninguno cuando no los tiene. Tampoco predice vigencia: se queda en `vigente` por defecto, así que su tasa de vigencia informada es solo la proporción de casos donde el oro también es `vigente`. La evaluación fina penaliza el atributo por defecto que no coincide. Es la línea base; se documenta.
 
 `enrel/evaluacion/cli_linea_base.py`: subcomando `linea-base-gliner` que carga el oro, corre `predecir_documento` sobre cada documento, guarda y muestra el tiempo por documento (también es un dato de CPU si se corre con `taskset -c 0-3`).
 

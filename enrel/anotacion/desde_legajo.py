@@ -145,9 +145,10 @@ class _Constructor:
             if clave in claves or (es_simetrica(mp.relacion, mp.atributo) and espejo in claves):
                 continue
             claves.add(clave)
-            relaciones.append(Relacion(cabeza.grupo, cola.grupo, mp.relacion, mp.atributo, ev))
+            relaciones.append(Relacion(cabeza.grupo, cola.grupo, mp.relacion, mp.atributo, mp.vigencia, ev))
         self.origen["designa"] = self.designa
         self.origen["predicados_originales"] = dict(self.origen["predicados_originales"])
+        self.origen["vigencias"] = dict(Counter(r.vigencia for r in relaciones))
         doc = Documento(
             doc_id=f"wp:{self.art.wp_id}",
             texto=self.art.texto,
@@ -234,7 +235,15 @@ def documento_desde_oro_json(spec: dict, articulo: Articulo, fuente: str = "oro"
                 c.origen["no_localizadas"] += 1
                 continue
             for ini, fin in aps:
-                m = c.mencion(pi, ini, fin, texto_p[ini:fin], tipo_e)
+                try:
+                    m = c.mencion(pi, ini, fin, texto_p[ini:fin], tipo_e)
+                except ValueError:
+                    # tipo de legajo sin equivalente en el esquema de enrel (p. ej. «monto»,
+                    # «obra» u «evento»): se descarta solo esta mención, no el documento ni
+                    # el resto de menciones del párrafo. Las relaciones que la toquen quedan
+                    # fuera solas, porque nunca entra en `primera`.
+                    c.origen["no_localizadas"] += 1
+                    continue
                 primera.setdefault(texto_e, m.id)
         for r in p.get("R", []):
             a, pred, b = r[0], r[1], r[2]
@@ -256,16 +265,23 @@ def documento_desde_sqlite(con: sqlite3.Connection, lote_id: int, articulo: Arti
         if pi not in c.textos_parrafo or c.textos_parrafo[pi][f["ini"] : f["fin"]] != f["texto"]:
             c.origen["no_localizadas"] += 1
             continue
-        c.mencion(
-            pi,
-            int(f["ini"]),
-            int(f["fin"]),
-            f["texto"],
-            f["tipo"],
-            mid=f["mid"],
-            designa=bool(f["designa"]),
-            grupo=f["grupo"],
-        )
+        try:
+            c.mencion(
+                pi,
+                int(f["ini"]),
+                int(f["fin"]),
+                f["texto"],
+                f["tipo"],
+                mid=f["mid"],
+                designa=bool(f["designa"]),
+                grupo=f["grupo"],
+            )
+        except ValueError:
+            # tipo de legajo sin equivalente en el esquema de enrel (p. ej. «monto», «obra»
+            # u «evento»): se descarta solo esta mención. Las relaciones que la toquen se
+            # filtran solas en `construir`, al no encontrar su mid en `por_mid`.
+            c.origen["no_localizadas"] += 1
+            continue
     pi_de = {f["mid"]: int(f["pi"]) for f in filas}
     for r in con.execute(
         "SELECT a_mid, b_mid, predicado, cuando FROM relaciones WHERE lote_id = ? AND wp_id = ?",

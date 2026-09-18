@@ -37,31 +37,25 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 **Se marca:** ley, decreto, sentencia, acto legislativo, resolución, tratado o acuerdo identificable («Ley 1448 de 2011», «Decreto 1320 de 1998», «Acuerdo de Paz», «Sentencia C-355», «artículo 49 de la Constitución»).
 **No se marca:** «la ley», «un decreto», «la norma», «la reforma» sin identificar.
 
-### obra
-**Se marca:** título de libro, informe, columna, programa, película, canción, medio como producto («Tierra de Nadie», «Detector de Mentiras», «Huevos Revueltos», «Revista Semana» cuando se nombra la publicación como obra).
-**No se marca:** «el informe», «un libro», «el artículo» sin título.
-
-### monto
-**Se marca:** cantidad con cifra o palabra de cantidad: «10 mil millones de pesos», «30 %», «48 a 108 meses», «un millón de dólares».
-**No se marca:** «recursos», «plata», «salarios», cifras hipotéticas («supongamos dos millones»).
-
 ## Relaciones
 
 ### ocupa_cargo
-**Definición:** Una persona ejerce, ejerció o busca un cargo. La cabeza es la persona; la cola es el cargo. Es la relación central del grafo de poder y la más frecuente. Si el texto da el cargo, se usa esta relación y no trabaja_en ni dirige.
-**Atributos:** actual: lo ejerce según el texto, en presente o sin marca de fin («el ministro de Hacienda, José Manuel Restrepo»); anterior: lo ejerció y ya no, con «ex», «fue», «entonces», «hasta», «renunció» («el exministro Restrepo», «fue alcalde de Bogotá»); aspirante: se postula o busca el cargo, con «candidato», «precandidato», «aspira», «suena para» («Char aspira a la Presidencia»).
+**Definición:** Una persona ejerce o ejerció un cargo (`titular`), o se postula o se postuló a él (`aspirante`). La cabeza es la persona; la cola es el cargo. Es la relación central del grafo de poder y la más frecuente. Si el texto da el cargo, se usa esta relación y no trabaja_en ni dirige. El atributo (titular/aspirante) es una modalidad, ortogonal a la vigencia (vigente/pasada/futura): una candidatura perdida es `aspirante` + `pasada`, no `titular` + algo; un nombramiento anunciado que aún no asume es `titular` + `futura`, no una candidatura.
+**Atributos:** titular: ejerce, ejerció o ejercerá el cargo; aspirante: se postula o se postuló al cargo, candidato, precandidato, aspirante.
 **Ejemplos:**
-- «El ministro de Hacienda, José Manuel Restrepo, anunció…» → Restrepo ocupa_cargo:actual «ministro de Hacienda».
-- «El exalcalde de Medellín Daniel Quintero» → Quintero ocupa_cargo:anterior «exalcalde de Medellín».
-- «Vicky Dávila, candidata presidencial» → Dávila ocupa_cargo:aspirante «candidata presidencial».
-- «El entonces gobernador de Antioquia, Luis Alfredo Ramos» → Ramos ocupa_cargo:anterior «gobernador de Antioquia».
+- «El ministro de Hacienda, José Manuel Restrepo, anunció…» → Restrepo ocupa_cargo:titular «ministro de Hacienda» (vigente).
+- «El exalcalde de Medellín Daniel Quintero» → Quintero ocupa_cargo:titular «exalcalde de Medellín» (pasada).
+- «Vicky Dávila, candidata presidencial» → Dávila ocupa_cargo:aspirante «candidata presidencial» (vigente).
+- «Aspiró a la Presidencia en 2018 y perdió» → (persona) ocupa_cargo:aspirante «Presidencia» (pasada): perdió la candidatura, no llegó a ejercer el cargo.
+- «El entonces gobernador de Antioquia, Luis Alfredo Ramos» → Ramos ocupa_cargo:titular «gobernador de Antioquia» (pasada).
 **No es:**
 - «Trabajó en el Ministerio de Hacienda» sin cargo nombrado: es trabaja_en con la organización.
 - «El abogado Pérez»: «abogado» es oficio, no cargo; no se marca relación.
 **Confusiones:**
 - Con trabaja_en: si hay cargo nombrado, ocupa_cargo; si solo hay organización, trabaja_en.
 - Con dirige: «alcaldesa de Bogotá» es ocupa_cargo con el cargo; dirige solo si además se menciona la organización («la Alcaldía»).
-- Con nombro_a: «Petro nombró a X ministro» produce nombro_a (Petro → X) y ocupa_cargo:actual (X → ministro).
+- Con nombro_a: «Petro nombró a X ministro» produce nombro_a (Petro → X) y ocupa_cargo:titular (X → ministro), vigente.
+- Titular frente a aspirante: un candidato derrotado nunca es titular; «será ministro» de un nombramiento ya anunciado sí es titular (vigencia futura), no aspirante.
 
 ### nombro_a
 **Definición:** Una persona u organización designa a una persona para un cargo o función. La cabeza es quien nombra; la cola es la persona nombrada.
@@ -104,7 +98,7 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 ### dirige
 **Definición:** Una persona encabeza, preside o gerencia una organización. La cabeza es la persona; la cola es la organización.
 **Ejemplos:**
-- «Ricardo Roa, presidente de Ecopetrol» → Roa dirige Ecopetrol, y Roa ocupa_cargo:actual «presidente de Ecopetrol».
+- «Ricardo Roa, presidente de Ecopetrol» → Roa dirige Ecopetrol, y Roa ocupa_cargo:titular «presidente de Ecopetrol».
 - «La firma es gerenciada por Juan Pérez» → Pérez dirige (la firma).
 - «Roy Barreras preside el Senado» → Barreras dirige Senado.
 **No es:**
@@ -213,29 +207,49 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Con hijo_de invertido: «su papá, Ricardo Romero» dicho de Camilo Romero produce Camilo familiar_de:hijo_de Ricardo, nunca al revés.
 
 ### apoya_a
-**Definición:** Una persona u organización respalda explícitamente a otra persona, organización o candidatura: apoyo, alianza, adhesión, coalición. La cabeza es quien apoya; la cola es lo apoyado.
+**Definición:** Una persona u organización respalda explícitamente a otra persona, organización, candidatura o norma: apoyo, alianza, adhesión, coalición o respaldo declarado a un proyecto de ley, sin que el texto afirme un acto legislativo concreto sobre la norma. La cabeza es quien apoya; la cola es lo apoyado. Si el texto afirma un acto (radicarla, redactarla, ser su ponente, sacarla adelante, sancionarla, aprobarla), gana la relación más específica: impulsa_norma, no apoya_a.
 **Ejemplos:**
 - «El Partido Liberal respaldó la candidatura de Petro» → Partido Liberal apoya_a Petro.
 - «Aliado del gobierno» → (persona) apoya_a (gobierno nombrado).
 - «Cambio Radical se sumó a la coalición de Duque» → Cambio Radical apoya_a Duque.
+- «El partido apoya la reforma tributaria» → (partido) apoya_a «reforma tributaria».
 **No es:**
 - Dos personas que aparecen en el mismo evento: no se marca.
 - «Petro nombró a X»: nombro_a.
+- «El senador radicó el proyecto de reforma tributaria»: hay un acto, no solo una postura; es impulsa_norma.
 **Confusiones:**
 - Con miembro_de: militar en un partido no es apoyar a su candidato salvo que el texto lo diga.
 - Con se_opone_a: el signo contrario.
+- Con impulsa_norma: una postura declarada de respaldo, sin acto, es apoya_a; radicar, redactar, ser ponente, sacar adelante, sancionar o aprobar una norma es un acto, y es impulsa_norma.
+
+### impulsa_norma
+**Definición:** Una persona u organización ejecuta un acto legislativo sobre una norma: la radica, la redacta, es su ponente, la saca adelante, la sanciona o la aprueba. La cabeza es quien ejecuta el acto; la cola es la norma. Gana sobre apoya_a cuando el texto afirma un acto y no solo una postura declarada.
+**Ejemplos:**
+- «Santos logró sacar adelante proyectos trascendentales como la ley de transferencias, la ley de pensiones y una reforma tributaria» → Santos impulsa_norma «ley de transferencias», Santos impulsa_norma «ley de pensiones», Santos impulsa_norma «reforma tributaria».
+- «El senador radicó el proyecto de reforma tributaria» → senador impulsa_norma «reforma tributaria».
+- «Fue la ponente de la ley de garantías» → (persona) impulsa_norma «ley de garantías».
+- «El presidente sancionó la reforma a la salud» → presidente impulsa_norma «reforma a la salud».
+**No es:**
+- «El partido apoya la reforma tributaria» sin acto concreto: apoya_a.
+- «La bancada hundió el proyecto» o «archivó la reforma»: es un acto, pero de signo contrario; se_opone_a, no impulsa_norma.
+**Confusiones:**
+- Con apoya_a: una postura declarada de respaldo, sin acto, es apoya_a; el acto (radicar, redactar, ser ponente, sacar adelante, sancionar, aprobar) es impulsa_norma.
+- Con se_opone_a: hundir o archivar una norma también es un acto, pero de signo contrario; no se mezclan los dos signos en una sola etiqueta, así que sigue siendo se_opone_a.
 
 ### se_opone_a
-**Definición:** Una persona u organización se opone o critica explícitamente a otra persona u organización. La cabeza es quien se opone; la cola es el criticado.
+**Definición:** Una persona u organización se opone o critica explícitamente a otra persona, organización o norma: oposición política, crítica, voto en contra o hundimiento de un proyecto de ley. La cabeza es quien se opone; la cola es lo criticado o combatido.
 **Ejemplos:**
 - «Uribe criticó al gobierno de Petro» → Uribe se_opone_a Petro.
 - «El Centro Democrático, en oposición al gobierno» → Centro Democrático se_opone_a (gobierno nombrado).
 - «Rival político de Char» → (persona) se_opone_a Char.
+- «La bancada del Centro Democrático votó en contra de la reforma» → Centro Democrático se_opone_a «reforma».
 **No es:**
-- «Criticó la reforma»: la cola es una norma, no se marca.
 - Dos candidatos al mismo cargo sin que el texto afirme rivalidad: no se marca.
+- «El proyecto fue radicado por Pérez»: eso es un acto a favor, impulsa_norma, no oposición.
 **Confusiones:**
 - Con investigado_por: denunciar penalmente ante una autoridad es se_opone_a solo si el texto lo presenta como oposición; la investigación la marca la autoridad.
+- Con impulsa_norma: hundir o archivar un proyecto es se_opone_a; radicarlo, redactarlo, ser su ponente, sacarlo adelante, sancionarlo o aprobarlo es impulsa_norma, el acto de signo contrario.
+- Con apoya_a: criticar es se_opone_a; una postura declarada de respaldo, sin acto, es apoya_a.
 
 ### investigado_por
 **Definición:** Una persona u organización está siendo investigada, imputada, acusada o fue condenada por una autoridad. La cabeza es el investigado; la cola es la autoridad. El delito no es una entidad y no se marca.

@@ -7,10 +7,12 @@ from enrel.esquema.tipos import RELACIONES, TIPOS
 def test_guia_completa():
     tipos, relaciones, convenciones = cargar_guia(Path("docs/guia-anotacion.md"))
     assert set(tipos) == set(TIPOS)
-    # La guía incluye vinculo_sin_tipo como relación de reserva además de las 17 de RELACIONES.
+    # La guía incluye vinculo_sin_tipo como relación de reserva además de las 18 de RELACIONES.
     assert set(RELACIONES) <= set(relaciones)
     assert len(convenciones) >= 6
     for r in relaciones.values():
         assert len(r.ejemplos) >= 3 and len(r.no_es) >= 2 and r.definicion, r.nombre
-    assert set(relaciones["ocupa_cargo"].atributos) == {"actual", "anterior", "aspirante"}
+    # ocupa_cargo tiene un atributo de modalidad (titular/aspirante), ortogonal a la vigencia,
+    # que es un eje propio de toda relación (enrel/esquema/tipos.py, enrel/datos/documento.py).
+    assert set(relaciones["ocupa_cargo"].atributos) == {"titular", "aspirante"}
     assert set(relaciones["familiar_de"].atributos) == {"conyuge", "hijo_de", "hermano", "otro"}

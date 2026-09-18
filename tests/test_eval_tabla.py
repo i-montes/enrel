@@ -32,7 +32,7 @@ def test_informe_macro_y_direccion_en_blanco_y_micro_doble():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo", "actual"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular"),
             Relacion("p1", "p2", "socio_de"),
         ]
     )
@@ -46,6 +46,11 @@ def test_informe_macro_y_direccion_en_blanco_y_micro_doble():
     celdas_direccion = [c.strip() for c in fila_direccion.split("|")]
     assert celdas_direccion[2] != "" and celdas_direccion[4] != ""  # n y R
     assert celdas_direccion[3] == "" and celdas_direccion[5] == ""  # P y F1 en blanco
+    # «vigencia» recibe el mismo tratamiento que «direccion»: solo n y R.
+    fila_vigencia = next(v for k, v in lineas.items() if k.startswith("vigencia"))
+    celdas_vigencia = [c.strip() for c in fila_vigencia.split("|")]
+    assert celdas_vigencia[2] != "" and celdas_vigencia[4] != ""  # n y R
+    assert celdas_vigencia[3] == "" and celdas_vigencia[5] == ""  # P y F1 en blanco
     assert "micro sin reserva" in lineas
     assert list(lineas).index("micro") < list(lineas).index("micro sin reserva")
 
@@ -54,7 +59,7 @@ def test_intervalo_cubre_el_valor():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo", "actual"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular"),
             Relacion("p1", "p2", "socio_de"),
         ]
     )

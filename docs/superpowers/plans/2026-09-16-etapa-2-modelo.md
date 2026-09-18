@@ -4,7 +4,7 @@
 
 **Objetivo:** construir el modelo (backbone MrBERT-es más una cabeza de tramos para entidades y una cabeza de pares para relaciones a nivel de documento), la conversión de documentos a tensores, el bucle de entrenamiento con parada por RE+ en desarrollo, la prueba de cordura, la inferencia de extremo a extremo con agrupación por reglas, el CLI `enrel extraer`, y el primer entrenamiento con la plata evaluado con la tabla completa.
 
-**Arquitectura:** un codificador compartido; cabeza de entidades por clasificación de tramos de hasta 16 palabras con representación inicio+fin+anchura; cabeza de relaciones por pares ordenados de grupos con agregación logsumexp de menciones, contexto local por atención aprendida sobre el documento, clasificador bilineal agrupado sobre 25 clases finas más una clase umbral (ATLOP), máscara de tipos, pérdida de umbral adaptativo con reponderación por clase. Todo opera sobre el documento entero, con recorte a 4.096 tokens en entrenamiento y ventanas en inferencia.
+**Arquitectura:** un codificador compartido; cabeza de entidades por clasificación de tramos de hasta 16 palabras con representación inicio+fin+anchura; cabeza de relaciones por pares ordenados de grupos con agregación logsumexp de menciones, contexto local por atención aprendida sobre el documento, clasificador bilineal agrupado sobre 25 clases finas más una clase umbral (ATLOP), máscara de tipos, pérdida de umbral adaptativo con reponderación por clase; una cabeza pequeña aparte, sobre la misma representación del par, predice la vigencia (vigente, pasada, futura) con su propia pérdida y un peso configurable, sin multiplicar las clases finas por tres. Todo opera sobre el documento entero, con recorte a 4.096 tokens en entrenamiento y ventanas en inferencia.
 
 **Tecnologías:** `torch` con CUDA, `transformers` (ModernBERT), `pyyaml`, `numpy`. Reutiliza etapa 0 (`Documento`, `agrupar`, evaluación) y etapa 1 (filtros).
 
@@ -278,9 +278,9 @@ git commit -m "Añade la carga del backbone"
 - Test: `tests/test_modelo_entidades.py`
 
 **Interfaces:**
-- `N_TIPOS = 7`; `NINGUNO = 7` (índice de la clase «ninguno»); `TIPO_A_INDICE = {t: i for i, t in enumerate(TIPOS)}`.
+- `N_TIPOS = 5`; `NINGUNO = 5` (índice de la clase «ninguno»); `TIPO_A_INDICE = {t: i for i, t in enumerate(TIPOS)}`.
 - `enumerar_tramos(n_palabras: int, max_ancho: int = 16) -> torch.LongTensor [S, 2]`: todos los `(i, j)` con `0 <= i <= j < n_palabras` y `j - i < max_ancho`.
-- `class CabezaEntidades(nn.Module)`: `__init__(hidden: int, max_ancho: int = 16, n_tipos: int = 7, dim_ancho: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], primera: LongTensor [B, P] (índice de subpalabra de la primera de cada palabra, rellenado con 0), ultima: LongTensor [B, P], tramos: LongTensor [B, S, 2] (índices de palabra, rellenados con 0), mascara_tramos: BoolTensor [B, S]) -> logits [B, S, n_tipos + 1]`. Representación: `concat(estados[primera[i]], estados[ultima[j]], emb_ancho(j - i))` → `Linear(2H + dim_ancho, H) → GELU → Dropout → Linear(H, n_tipos + 1)`.
+- `class CabezaEntidades(nn.Module)`: `__init__(hidden: int, max_ancho: int = 16, n_tipos: int = 5, dim_ancho: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], primera: LongTensor [B, P] (índice de subpalabra de la primera de cada palabra, rellenado con 0), ultima: LongTensor [B, P], tramos: LongTensor [B, S, 2] (índices de palabra, rellenados con 0), mascara_tramos: BoolTensor [B, S]) -> logits [B, S, n_tipos + 1]`. Representación: `concat(estados[primera[i]], estados[ultima[j]], emb_ancho(j - i))` → `Linear(2H + dim_ancho, H) → GELU → Dropout → Linear(H, n_tipos + 1)`.
 
 - [ ] **Paso 1: Test**
 
@@ -304,14 +304,14 @@ def test_forward_formas():
     tramos = torch.tensor([[[0, 0], [0, 1], [1, 2], [2, 3]], [[0, 0], [0, 1], [0, 0], [0, 0]]])
     mascara = torch.tensor([[True, True, True, True], [True, True, False, False]])
     logits = cabeza(estados, primera, ultima, tramos, mascara)
-    assert logits.shape == (2, 4, 8) and NINGUNO == 7
+    assert logits.shape == (2, 4, 6) and NINGUNO == 5
     assert torch.isfinite(logits).all()
 ```
 
 - [ ] **Paso 2: Implementar `enrel/modelo/entidades.py`**
 
 ```python
-"""Cabeza de entidades: clasifica tramos de 1 a `max_ancho` palabras en 7 tipos más «ninguno»."""
+"""Cabeza de entidades: clasifica tramos de 1 a `max_ancho` palabras en 5 tipos más «ninguno»."""
 
 import torch
 from torch import nn
@@ -366,11 +366,12 @@ git commit -m "Añade la cabeza de entidades por clasificación de tramos"
 
 **Interfaces:**
 - `N_CLASES = len(CLASES_FINAS)` (25); `TH = N_CLASES` (índice del logit umbral; la salida tiene `N_CLASES + 1` columnas).
-- `class CabezaRelaciones(nn.Module)`: `__init__(hidden: int, n_clases: int = 25, tam_grupo: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], mascara_tokens: BoolTensor [B, T], menciones: LongTensor [B, G, M] (índice de la primera subpalabra de cada mención de cada grupo, relleno 0), mascara_menciones: BoolTensor [B, G, M], pares: LongTensor [B, R, 2] (índices de grupo), mascara_pares: BoolTensor [B, R]) -> logits [B, R, n_clases + 1]`.
+- `class CabezaRelaciones(nn.Module)`: `__init__(hidden: int, n_clases: int = 25, tam_grupo: int = 64, dropout: float = 0.1)`; `forward(estados: [B, T, H], mascara_tokens: BoolTensor [B, T], menciones: LongTensor [B, G, M] (índice de la primera subpalabra de cada mención de cada grupo, relleno 0), mascara_menciones: BoolTensor [B, G, M], pares: LongTensor [B, R, 2] (índices de grupo), mascara_pares: BoolTensor [B, R]) -> tuple[logits [B, R, n_clases + 1], logits_vigencia [B, R, 3]]`.
   - Representación de grupo `g[b, k] = logsumexp(estados[b, menciones[b, k, :]])` sobre las menciones válidas.
   - Contexto local del par: `q = W_q(concat(g_cabeza, g_cola))` `[B, R, H]`; `puntuaciones = (q @ estados^T) / sqrt(H)` `[B, R, T]` con máscara de tokens; `c = softmax(puntuaciones) @ estados`. Esta atención aprendida sustituye a la reutilización de la atención del codificador de ATLOP porque se exporta a ONNX sin depender de la implementación de atención del backbone. Guarda `self.ultima_atencion` (`[B, R, T]`, detach) para la evidencia en inferencia.
   - `z_c = tanh(W_c(concat(g_cabeza, c)))`, `z_t = tanh(W_t(concat(g_cola, c)))`, ambos de dimensión `H`; bilineal agrupado: se reordenan en `H / tam_grupo` grupos de `tam_grupo` y `logits = W_b(vec(z_c_k ⊗ z_t_k) para todo k)` con `W_b: Linear((H / tam_grupo) * tam_grupo * tam_grupo, n_clases + 1)`.
-  - Salida enmascarada a 0 en pares de relleno.
+  - Cabeza de vigencia, pequeña y aparte, sobre la misma representación del par (`concat(g_cabeza, g_cola, c)`, dimensión `3H`): `logits_vigencia = W_v(concat(g_cabeza, g_cola, c))` con `W_v: Linear(3H, 3)` (vigente, pasada, futura). No comparte el bilineal agrupado ni multiplica `n_clases`.
+  - Ambas salidas enmascaradas a 0 en pares de relleno.
 
 - [ ] **Paso 1: Test**
 
@@ -390,12 +391,13 @@ def test_forward_formas_y_atencion():
     mascara_menciones = torch.tensor([[[1, 1, 0], [1, 0, 0], [1, 1, 1]], [[1, 0, 0], [1, 1, 0], [0, 0, 0]]], dtype=torch.bool)
     pares = torch.tensor([[[0, 1], [1, 0], [0, 2]], [[0, 1], [0, 0], [0, 0]]])
     mascara_pares = torch.tensor([[True, True, True], [True, False, False]])
-    logits = cabeza(estados, mascara_tokens, menciones, mascara_menciones, pares, mascara_pares)
+    logits, logits_vigencia = cabeza(estados, mascara_tokens, menciones, mascara_menciones, pares, mascara_pares)
     assert logits.shape == (2, 3, 26) and TH == 25
-    assert torch.isfinite(logits).all()
+    assert logits_vigencia.shape == (2, 3, 3)
+    assert torch.isfinite(logits).all() and torch.isfinite(logits_vigencia).all()
     assert cabeza.ultima_atencion.shape == (2, 3, 12)
     assert torch.allclose(cabeza.ultima_atencion[1, 0, 8:], torch.zeros(4))   # tokens enmascarados sin peso
-    assert (logits[1, 1] == 0).all()                                            # par de relleno
+    assert (logits[1, 1] == 0).all() and (logits_vigencia[1, 1] == 0).all()      # par de relleno
 ```
 
 - [ ] **Paso 2: Implementar `enrel/modelo/relaciones.py`**
@@ -423,6 +425,7 @@ class CabezaRelaciones(nn.Module):
         self.proy_cabeza = nn.Linear(2 * hidden, hidden)
         self.proy_cola = nn.Linear(2 * hidden, hidden)
         self.bilineal = nn.Linear(self.k * tam_grupo * tam_grupo, n_clases + 1)
+        self.vigencia = nn.Linear(3 * hidden, 3)  # cabeza pequeña aparte: vigente, pasada, futura; no multiplica n_clases
         self.dropout = nn.Dropout(dropout)
         self.ultima_atencion: torch.Tensor | None = None
 
@@ -461,7 +464,7 @@ class CabezaRelaciones(nn.Module):
 ```bash
 uv run pytest tests/test_modelo_relaciones.py -q
 git add enrel/modelo/relaciones.py tests/test_modelo_relaciones.py
-git commit -m "Añade la cabeza de relaciones con contexto por atención y bilineal agrupado"
+git commit -m "Añade la cabeza de relaciones con contexto por atención, bilineal agrupado y la cabeza de vigencia"
 ```
 
 ---
@@ -474,6 +477,7 @@ git commit -m "Añade la cabeza de relaciones con contexto por atención y bilin
 
 **Interfaces:**
 - `perdida_entidades(logits: [B, S, C], etiquetas: LongTensor [B, S] (índice de tipo o NINGUNO; -100 para relleno)) -> Tensor escalar`: entropía cruzada con `ignore_index=-100`.
+- `perdida_vigencia(logits_vigencia: [B, R, 3], etiquetas_vigencia: LongTensor [B, R] (0 vigente, 1 pasada, 2 futura; -100 si el par no tiene relación positiva con vigencia definida o es de relleno)) -> Tensor escalar`: entropía cruzada con `ignore_index=-100`, igual que `perdida_entidades`. Es la pérdida propia de la cabeza de vigencia, ortogonal a `perdida_umbral_adaptativo`.
 - `perdida_umbral_adaptativo(logits: [B, R, C+1], etiquetas: FloatTensor [B, R, C] multi-hot, mascara_pares: BoolTensor [B, R], pesos_clase: Tensor [C] | None = None) -> Tensor escalar`. La pérdida de ATLOP: para cada par, (1) `-log softmax(logits sobre {positivas ∪ TH})[positivas]` sumado sobre positivas (ponderado por `pesos_clase` si se da), y (2) `-log softmax(logits sobre {negativas ∪ TH})[TH]`; promedio sobre pares válidos. Los pares sin positivas solo aportan el término (2).
 - `decodificar_umbral(logits: [B, R, C+1], mascara_clases: BoolTensor [B, R, C] | None = None) -> BoolTensor [B, R, C]`: clase positiva si su logit supera al de TH y a 0 no hace falta; con `mascara_clases`, las clases no admitidas se ponen a `-inf` antes.
 - `confianzas(logits) -> Tensor [B, R, C]`: `sigmoid(logits[..., :C] - logits[..., TH:TH+1])`.
@@ -487,7 +491,7 @@ import pytest
 torch = pytest.importorskip("torch")
 from enrel.esquema.tipos import CLASES_FINAS
 from enrel.modelo.perdidas import (confianzas, decodificar_umbral, perdida_entidades, perdida_umbral_adaptativo,
-                                   pesos_por_frecuencia)
+                                   perdida_vigencia, pesos_por_frecuencia)
 
 C = len(CLASES_FINAS)
 
@@ -497,6 +501,13 @@ def test_perdida_entidades_ignora_relleno():
     etiquetas = torch.tensor([[7, 0, -100]])
     p = perdida_entidades(logits, etiquetas)
     assert torch.isclose(p, torch.log(torch.tensor(8.0)))
+
+
+def test_perdida_vigencia_ignora_pares_sin_relacion():
+    logits_vigencia = torch.zeros(1, 3, 3)
+    etiquetas_vigencia = torch.tensor([[0, 1, -100]])
+    p = perdida_vigencia(logits_vigencia, etiquetas_vigencia)
+    assert torch.isclose(p, torch.log(torch.tensor(3.0)))
 
 
 def test_umbral_adaptativo_baja_con_logits_correctos():
@@ -552,6 +563,11 @@ def perdida_entidades(logits: torch.Tensor, etiquetas: torch.Tensor) -> torch.Te
     return F.cross_entropy(logits.reshape(-1, logits.size(-1)), etiquetas.reshape(-1), ignore_index=-100)
 
 
+def perdida_vigencia(logits_vigencia: torch.Tensor, etiquetas_vigencia: torch.Tensor) -> torch.Tensor:
+    """Pérdida propia de la cabeza de vigencia (3 clases), ortogonal a la de relaciones."""
+    return F.cross_entropy(logits_vigencia.reshape(-1, 3), etiquetas_vigencia.reshape(-1), ignore_index=-100)
+
+
 def perdida_umbral_adaptativo(logits: torch.Tensor, etiquetas: torch.Tensor, mascara_pares: torch.Tensor,
                               pesos_clase: torch.Tensor | None = None) -> torch.Tensor:
     B, R, _ = logits.shape
@@ -594,7 +610,7 @@ def pesos_por_frecuencia(conteos: dict[str, int], suavizado: float = 1.0, potenc
 ```bash
 uv run pytest tests/test_modelo_perdidas.py -q
 git add enrel/modelo/perdidas.py tests/test_modelo_perdidas.py
-git commit -m "Añade las pérdidas de tramos y de umbral adaptativo, y la decodificación TH"
+git commit -m "Añade las pérdidas de tramos, umbral adaptativo y vigencia, y la decodificación TH"
 ```
 
 ---
@@ -607,7 +623,7 @@ git commit -m "Añade las pérdidas de tramos y de umbral adaptativo, y la decod
 
 **Interfaces:**
 - `@dataclass class ConfigModelo: backbone: str = "BSC-LT/MrBERT-es"; max_ancho: int = 16; tam_grupo: int = 64; dropout: float = 0.1; max_grupos: int = 60; version: str = "0.1"; clases_finas: list[str] = CLASES_FINAS; tipos: list[str] = TIPOS`.
-- `class ModeloEnrel(nn.Module)`: `__init__(config: ConfigModelo, checkpointing: bool = False, atencion: str | None = None)` carga el backbone y crea las dos cabezas; atributos `tok`, `backbone`, `entidades`, `relaciones`, `config`. `forward(lote) -> dict` con `logits_entidades` y `logits_relaciones` (`None` si el lote no trae pares); `lote` es el `Lote` de la Tarea 2.8 (aquí se documentan sus campos: `input_ids, attention_mask, primera, ultima, tramos, mascara_tramos, menciones, mascara_menciones, pares, mascara_pares`).
+- `class ModeloEnrel(nn.Module)`: `__init__(config: ConfigModelo, checkpointing: bool = False, atencion: str | None = None)` carga el backbone y crea las dos cabezas; atributos `tok`, `backbone`, `entidades`, `relaciones`, `config`. `forward(lote) -> dict` con `logits_entidades`, `logits_relaciones` y `logits_vigencia` (los dos últimos `None` si el lote no trae pares); `lote` es el `Lote` de la Tarea 2.8 (aquí se documentan sus campos: `input_ids, attention_mask, primera, ultima, tramos, mascara_tramos, menciones, mascara_menciones, pares, mascara_pares`).
 - `guardar(self, directorio: Path)`: `config.json`, `backbone/` con `save_pretrained` (modelo y tokenizer), `cabezas.safetensors` con los `state_dict` de las dos cabezas bajo prefijos `entidades.` y `relaciones.`.
 - `ModeloEnrel.cargar(directorio: Path, atencion: str | None = None) -> ModeloEnrel` (classmethod).
 - `mascara_tipos(tipos_cabeza: list[str], tipos_cola: list[str]) -> BoolTensor [R, C]`: para cada par, `True` en las clases finas cuya relación `admite(tipo_cabeza, tipo_cola)`; `vinculo_sin_tipo` siempre `True`. Se precomputa una tabla `TABLA_TIPOS[tipo_a][tipo_b] -> BoolTensor [C]` al importar.
@@ -626,8 +642,8 @@ from enrel.modelo.enrel import ConfigModelo, ModeloEnrel, mascara_tipos
 def test_mascara_tipos():
     m = mascara_tipos(["persona", "persona"], ["cargo", "lugar"])
     assert m.shape == (2, len(CLASES_FINAS))
-    assert m[0, INDICE_CLASE["ocupa_cargo:actual"]] and not m[0, INDICE_CLASE["dirige"]]
-    assert m[1, INDICE_CLASE["ubicado_en"]] and not m[1, INDICE_CLASE["ocupa_cargo:actual"]]
+    assert m[0, INDICE_CLASE["ocupa_cargo:titular"]] and not m[0, INDICE_CLASE["dirige"]]
+    assert m[1, INDICE_CLASE["ubicado_en"]] and not m[1, INDICE_CLASE["ocupa_cargo:titular"]]
     assert m[:, INDICE_CLASE["vinculo_sin_tipo"]].all()
 
 
@@ -710,10 +726,11 @@ class ModeloEnrel(nn.Module):
         salida = {"estados": estados,
                   "logits_entidades": self.entidades(estados, lote.primera, lote.ultima, lote.tramos, lote.mascara_tramos)}
         if lote.pares is not None and lote.pares.numel() > 0:
-            salida["logits_relaciones"] = self.relaciones(estados, lote.attention_mask.bool(), lote.menciones,
-                                                          lote.mascara_menciones, lote.pares, lote.mascara_pares)
+            salida["logits_relaciones"], salida["logits_vigencia"] = self.relaciones(
+                estados, lote.attention_mask.bool(), lote.menciones, lote.mascara_menciones, lote.pares, lote.mascara_pares)
         else:
             salida["logits_relaciones"] = None
+            salida["logits_vigencia"] = None
         return salida
 
     def parametros_por_grupo(self) -> list[dict]:
@@ -760,12 +777,13 @@ git commit -m "Añade el modelo completo con guardado, carga y máscara de tipos
 - Test: `tests/test_entrenamiento_tensores.py`
 
 **Interfaces:**
-- `@dataclass class Ejemplo: doc_id: str; input_ids: list[int]; attention_mask: list[int]; primera: list[int]; ultima: list[int]; tramos: list[tuple[int, int]]; etiquetas_tramos: list[int]; menciones: list[list[int]]` (por grupo, índices de primera subpalabra de sus menciones incluidas en la ventana); `tipos_grupo: list[str]; pares: list[tuple[int, int]]; etiquetas_pares: list[list[int]]` (multi-hot de longitud `C` por par); `mascara_clases: list[list[bool]]` (por par, clases admitidas por tipos); `recorte_grupos: int`.
+- `INDICE_VIGENCIA = {v: i for i, v in enumerate(VIGENCIAS)}` (`VIGENCIAS` de `enrel.esquema.tipos`, orden vigente=0, pasada=1, futura=2).
+- `@dataclass class Ejemplo: doc_id: str; input_ids: list[int]; attention_mask: list[int]; primera: list[int]; ultima: list[int]; tramos: list[tuple[int, int]]; etiquetas_tramos: list[int]; menciones: list[list[int]]` (por grupo, índices de primera subpalabra de sus menciones incluidas en la ventana); `tipos_grupo: list[str]; pares: list[tuple[int, int]]; etiquetas_pares: list[list[int]]` (multi-hot de longitud `C` por par); `mascara_clases: list[list[bool]]` (por par, clases admitidas por tipos); `etiquetas_vigencia: list[int]` (por par, índice de `INDICE_VIGENCIA` de la vigencia de oro, o `-100` si el par no tiene relación de oro); `recorte_grupos: int`.
 - `ejemplo_desde_documento(doc: Documento, tok, max_len: int = 4096, max_ancho: int = 16, ratio_negativos: int = 8, max_grupos: int = 60, rng: random.Random | None = None, todos_los_tramos: bool = False) -> Ejemplo`:
   1. `codificar(tok, doc.texto, max_len)`.
   2. Menciones dentro de la ventana → `(i, j)` de palabras vía `palabra_de`; las que no caben se descartan (contador `menciones_fuera`). Tramos positivos: cada mención con `j - i < max_ancho` (las más largas se cuentan en `menciones_largas` y no se usan). Negativos: si `todos_los_tramos`, todos los tramos posibles no positivos (para inferencia y cordura); si no, `ratio_negativos × positivos` tramos al azar no positivos (mínimo 32), con `rng`.
   3. Grupos con al menos una mención en la ventana, ordenados por número de menciones descendente y recortados a `max_grupos` (`recorte_grupos` = cuántos se quitaron). `menciones[k]` = primeras subpalabras de las menciones del grupo `k`.
-  4. Pares: todos los `(a, b)` ordenados con `a != b` para los que `mascara_tipos` tiene alguna clase admitida además de `vinculo_sin_tipo` **o** existe una relación de oro entre ellos. `etiquetas_pares[r][INDICE_CLASE[clase_fina]] = 1` para cada relación del documento entre esos grupos (simétricas: se marca en ambas direcciones). `mascara_clases[r]` de `mascara_tipos`.
+  4. Pares: todos los `(a, b)` ordenados con `a != b` para los que `mascara_tipos` tiene alguna clase admitida además de `vinculo_sin_tipo` **o** existe una relación de oro entre ellos. `etiquetas_pares[r][INDICE_CLASE[clase_fina]] = 1` para cada relación del documento entre esos grupos (simétricas: se marca en ambas direcciones, con la misma vigencia). `mascara_clases[r]` de `mascara_tipos`. `etiquetas_vigencia[r]` = `INDICE_VIGENCIA` de la vigencia de la primera relación de oro encontrada entre esos grupos (se cuenta en `vigencias_conflicto` si una segunda relación del mismo par trae una vigencia distinta), o `-100` si el par no tiene relación de oro.
 - `conteo_clases(docs: list[Documento]) -> dict[str, int]`: clases finas positivas en un conjunto (para `pesos_por_frecuencia`).
 
 - [ ] **Paso 1: Test (con tiny-bert)**
@@ -800,13 +818,16 @@ def test_ejemplo_basico(tok):
     idx_pares = {p: k for k, p in enumerate(e.pares)}
     g = {g.id: k for k, g in enumerate(d.grupos)}
     r = idx_pares[(g["e2"], g["e3"])]
-    assert e.etiquetas_pares[r][INDICE_CLASE["ocupa_cargo:actual"]] == 1
-    assert e.mascara_clases[r][INDICE_CLASE["ocupa_cargo:actual"]] and not e.mascara_clases[r][INDICE_CLASE["dirige"]]
+    assert e.etiquetas_pares[r][INDICE_CLASE["ocupa_cargo:titular"]] == 1
+    assert e.mascara_clases[r][INDICE_CLASE["ocupa_cargo:titular"]] and not e.mascara_clases[r][INDICE_CLASE["dirige"]]
+    assert e.etiquetas_vigencia[r] in (0, 1, 2)                      # ocupa_cargo:titular tiene vigencia de oro
+    for k, y in enumerate(e.etiquetas_pares):                        # sin relación de oro → sin vigencia que aprender
+        assert (e.etiquetas_vigencia[k] == -100) == (sum(y) == 0)
     assert (g["e3"], g["e4"]) not in idx_pares or True   # cargo→organizacion no admite nada salvo sin tipo: puede faltar
 
 
 def test_conteo_clases():
-    assert conteo_clases([doc_ejemplo()]) == {"nombro_a": 1, "ocupa_cargo:actual": 1}
+    assert conteo_clases([doc_ejemplo()]) == {"nombro_a": 1, "ocupa_cargo:titular": 1}
 ```
 
 - [ ] **Paso 2: Implementar `enrel/entrenamiento/tensores.py`**
@@ -819,13 +840,14 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from enrel.datos.documento import Documento
-from enrel.esquema.tipos import CLASES_FINAS, INDICE_CLASE, SIN_TIPO, clase_fina, es_simetrica
+from enrel.esquema.tipos import CLASES_FINAS, INDICE_CLASE, SIN_TIPO, VIGENCIAS, clase_fina, es_simetrica
 from enrel.modelo.entidades import NINGUNO, TIPO_A_INDICE, enumerar_tramos
 from enrel.modelo.enrel import mascara_tipos
 from enrel.modelo.tokenizacion import codificar, palabra_de
 
 C = len(CLASES_FINAS)
 IDX_SIN_TIPO = INDICE_CLASE[SIN_TIPO]
+INDICE_VIGENCIA = {v: i for i, v in enumerate(VIGENCIAS)}
 
 
 @dataclass
@@ -842,6 +864,7 @@ class Ejemplo:
     pares: list[tuple[int, int]]
     etiquetas_pares: list[list[int]]
     mascara_clases: list[list[bool]]
+    etiquetas_vigencia: list[int]
     recorte_grupos: int = 0
     contadores: dict = field(default_factory=dict)
 
@@ -890,6 +913,7 @@ def ejemplo_desde_documento(doc: Documento, tok, max_len: int = 4096, max_ancho:
     menciones = [menciones_por_grupo[g] for g in grupos]
 
     oro: dict[tuple[int, int], set[int]] = {}
+    vigencia_oro: dict[tuple[int, int], str] = {}
     for r in doc.relaciones:
         if r.cabeza not in indice_grupo or r.cola not in indice_grupo:
             cont["relaciones_fuera"] += 1
@@ -897,10 +921,15 @@ def ejemplo_desde_documento(doc: Documento, tok, max_len: int = 4096, max_ancho:
         a, b = indice_grupo[r.cabeza], indice_grupo[r.cola]
         idx = INDICE_CLASE[clase_fina(r.relacion, r.atributo)]
         oro.setdefault((a, b), set()).add(idx)
+        if (a, b) in vigencia_oro and vigencia_oro[(a, b)] != r.vigencia:
+            cont["vigencias_conflicto"] += 1
+        else:
+            vigencia_oro.setdefault((a, b), r.vigencia)
         if es_simetrica(r.relacion, r.atributo):
             oro.setdefault((b, a), set()).add(idx)
+            vigencia_oro.setdefault((b, a), r.vigencia)
 
-    pares, etiquetas_pares, mascara_clases = [], [], []
+    pares, etiquetas_pares, mascara_clases, etiquetas_vigencia = [], [], [], []
     if len(grupos) >= 2:
         todos = [(a, b) for a in range(len(grupos)) for b in range(len(grupos)) if a != b]
         masc = mascara_tipos([tipos_grupo[a] for a, _ in todos], [tipos_grupo[b] for _, b in todos])
@@ -915,9 +944,11 @@ def ejemplo_desde_documento(doc: Documento, tok, max_len: int = 4096, max_ancho:
                 y[idx] = 1
             etiquetas_pares.append(y)
             mascara_clases.append(fila.tolist())
+            etiquetas_vigencia.append(INDICE_VIGENCIA[vigencia_oro[(a, b)]] if (a, b) in vigencia_oro else -100)
 
     return Ejemplo(doc.doc_id, cod.input_ids, cod.attention_mask, cod.primera_subpalabra, cod.ultima_subpalabra,
-                   candidatos, etiquetas_tramos, menciones, tipos_grupo, pares, etiquetas_pares, mascara_clases, recorte, dict(cont))
+                   candidatos, etiquetas_tramos, menciones, tipos_grupo, pares, etiquetas_pares, mascara_clases,
+                   etiquetas_vigencia, recorte, dict(cont))
 
 
 def conteo_clases(docs: list[Documento]) -> dict[str, int]:
@@ -933,7 +964,7 @@ def conteo_clases(docs: list[Documento]) -> dict[str, int]:
 ```bash
 uv run pytest tests/test_entrenamiento_tensores.py -q
 git add enrel/entrenamiento/__init__.py enrel/entrenamiento/tensores.py tests/test_entrenamiento_tensores.py
-git commit -m "Añade la conversión de documentos a tramos, grupos y pares con sus etiquetas"
+git commit -m "Añade la conversión de documentos a tramos, grupos, pares y sus etiquetas, con la vigencia"
 ```
 
 ---
@@ -945,8 +976,8 @@ git commit -m "Añade la conversión de documentos a tramos, grupos y pares con 
 - Test: `tests/test_entrenamiento_colacion.py`
 
 **Interfaces:**
-- `@dataclass class Lote: doc_ids: list[str]; input_ids: LongTensor [B, T]; attention_mask: LongTensor [B, T]; primera: LongTensor [B, P]; ultima: LongTensor [B, P]; tramos: LongTensor [B, S, 2]; mascara_tramos: BoolTensor [B, S]; etiquetas_tramos: LongTensor [B, S] (-100 en relleno); menciones: LongTensor [B, G, M]; mascara_menciones: BoolTensor [B, G, M]; pares: LongTensor [B, R, 2] | None; mascara_pares: BoolTensor [B, R]; etiquetas_pares: FloatTensor [B, R, C]; mascara_clases: BoolTensor [B, R, C]; tipos_grupo: list[list[str]]` y método `a(dispositivo) -> Lote`.
-- `colar(ejemplos: list[Ejemplo], pad_id: int) -> Lote`: rellena a las longitudes máximas del lote (`T`, `P`, `S`, `G`, `M`, `R`); si ningún ejemplo tiene pares, `pares = None` y los tensores de relaciones tienen `R = 0`.
+- `@dataclass class Lote: doc_ids: list[str]; input_ids: LongTensor [B, T]; attention_mask: LongTensor [B, T]; primera: LongTensor [B, P]; ultima: LongTensor [B, P]; tramos: LongTensor [B, S, 2]; mascara_tramos: BoolTensor [B, S]; etiquetas_tramos: LongTensor [B, S] (-100 en relleno); menciones: LongTensor [B, G, M]; mascara_menciones: BoolTensor [B, G, M]; pares: LongTensor [B, R, 2] | None; mascara_pares: BoolTensor [B, R]; etiquetas_pares: FloatTensor [B, R, C]; mascara_clases: BoolTensor [B, R, C]; etiquetas_vigencia: LongTensor [B, R] (-100 en relleno y en pares sin relación de oro); tipos_grupo: list[list[str]]` y método `a(dispositivo) -> Lote`.
+- `colar(ejemplos: list[Ejemplo], pad_id: int) -> Lote`: rellena a las longitudes máximas del lote (`T`, `P`, `S`, `G`, `M`, `R`); si ningún ejemplo tiene pares, `pares = None` y los tensores de relaciones tienen `R = 0`. `etiquetas_vigencia` se rellena con `-100` igual que `etiquetas_tramos`.
 
 - [ ] **Paso 1: Test**
 
@@ -958,14 +989,15 @@ from enrel.entrenamiento.colacion import colar
 from enrel.entrenamiento.tensores import Ejemplo
 
 
-def ej(doc_id, n_tok, n_pal, tramos, grupos, pares):
+def ej(doc_id, n_tok, n_pal, tramos, grupos, pares, vigs=None):
+    vigs = vigs if vigs is not None else [-100] * len(pares)
     return Ejemplo(doc_id, list(range(n_tok)), [1] * n_tok, list(range(1, n_pal + 1)), list(range(1, n_pal + 1)),
                    tramos, [7] * len(tramos), grupos, ["persona"] * len(grupos), pares, [[0] * 25 for _ in pares],
-                   [[True] * 25 for _ in pares])
+                   [[True] * 25 for _ in pares], vigs)
 
 
 def test_colar_rellena():
-    a = ej("a", 5, 3, [(0, 0), (1, 2)], [[1, 2], [3]], [(0, 1), (1, 0)])
+    a = ej("a", 5, 3, [(0, 0), (1, 2)], [[1, 2], [3]], [(0, 1), (1, 0)], vigs=[0, -100])
     b = ej("b", 8, 6, [(0, 1)], [[1]], [])
     lote = colar([a, b], pad_id=0)
     assert lote.input_ids.shape == (2, 8) and lote.attention_mask[0, 5:].sum() == 0
@@ -974,12 +1006,14 @@ def test_colar_rellena():
     assert lote.menciones.shape == (2, 2, 2) and lote.mascara_menciones[0].tolist() == [[True, True], [True, False]]
     assert lote.pares.shape == (2, 2, 2) and lote.mascara_pares.tolist() == [[True, True], [False, False]]
     assert lote.etiquetas_pares.shape == (2, 2, 25)
+    assert lote.etiquetas_vigencia.shape == (2, 2) and lote.etiquetas_vigencia.tolist() == [[0, -100], [-100, -100]]
 
 
 def test_sin_pares():
     b = ej("b", 4, 2, [(0, 0)], [[1]], [])
     lote = colar([b], pad_id=0)
     assert lote.pares is None and lote.mascara_pares.shape == (1, 0)
+    assert lote.etiquetas_vigencia.shape == (1, 0)
 ```
 
 - [ ] **Paso 2: Implementar `enrel/entrenamiento/colacion.py`**
@@ -1010,6 +1044,7 @@ class Lote:
     mascara_pares: torch.Tensor
     etiquetas_pares: torch.Tensor
     mascara_clases: torch.Tensor
+    etiquetas_vigencia: torch.Tensor
     tipos_grupo: list[list[str]]
 
     def a(self, dispositivo) -> "Lote":
@@ -1052,13 +1087,16 @@ def colar(ejemplos: list[Ejemplo], pad_id: int) -> Lote:
         mascara_pares = torch.zeros(B, 0, dtype=torch.bool)
         etiquetas_pares = torch.zeros(B, 0, C)
         mascara_clases = torch.zeros(B, 0, C, dtype=torch.bool)
+        etiquetas_vigencia = torch.zeros(B, 0, dtype=torch.long)
     else:
         pares = torch.tensor([[list(p) for p in e.pares] + [[0, 0]] * (R - len(e.pares)) for e in ejemplos], dtype=torch.long)
         mascara_pares = torch.tensor([[True] * len(e.pares) + [False] * (R - len(e.pares)) for e in ejemplos])
         etiquetas_pares = torch.tensor([e.etiquetas_pares + [[0] * C] * (R - len(e.pares)) for e in ejemplos], dtype=torch.float32)
         mascara_clases = torch.tensor([e.mascara_clases + [[False] * C] * (R - len(e.pares)) for e in ejemplos])
+        etiquetas_vigencia = torch.tensor([e.etiquetas_vigencia + [-100] * (R - len(e.pares)) for e in ejemplos], dtype=torch.long)
     return Lote([e.doc_id for e in ejemplos], input_ids, attention_mask, primera, ultima, tramos, mascara_tramos, etiquetas_tramos,
-                menciones, mascara_menciones, pares, mascara_pares, etiquetas_pares, mascara_clases, [e.tipos_grupo for e in ejemplos])
+                menciones, mascara_menciones, pares, mascara_pares, etiquetas_pares, mascara_clases, etiquetas_vigencia,
+                [e.tipos_grupo for e in ejemplos])
 ```
 
 - [ ] **Paso 3: Correr tests y commit**
@@ -1078,7 +1116,7 @@ git commit -m "Añade la colación de ejemplos en lotes con relleno"
 - Test: `tests/test_entrenamiento_config.py`
 
 **Interfaces:**
-- `@dataclass class Config: nombre: str; backbone: str; entrenamiento: list[str]` (rutas JSONL) `; desarrollo: str; punto_de_partida: str | None = None` (directorio de un modelo guardado; si es `None`, backbone desde HF) `; max_len: int = 4096; max_ancho: int = 16; max_grupos: int = 60; ratio_negativos: int = 8; lote: int = 2; acumulacion: int = 8; lr_codificador: float = 3e-5; lr_cabezas: float = 1e-4; weight_decay: float = 0.01; warmup: float = 0.1; epocas: int = 8; paciencia: int = 2; semilla: int = 42; bf16: bool = True; checkpointing: bool = True; pesos_por_clase: bool = True; peso_relaciones: float = 1.0; peso_entidades: float = 1.0; congelar_capas_inferiores: int = 0; salida: str = "corridas"; evaluar_cada: int = 1` (épocas) `; fraccion_ancla: float = 0.0` (fracción de la primera ruta de entrenamiento que se mezcla como ancla; para la etapa 2).
+- `@dataclass class Config: nombre: str; backbone: str; entrenamiento: list[str]` (rutas JSONL) `; desarrollo: str; punto_de_partida: str | None = None` (directorio de un modelo guardado; si es `None`, backbone desde HF) `; max_len: int = 4096; max_ancho: int = 16; max_grupos: int = 60; ratio_negativos: int = 8; lote: int = 2; acumulacion: int = 8; lr_codificador: float = 3e-5; lr_cabezas: float = 1e-4; weight_decay: float = 0.01; warmup: float = 0.1; epocas: int = 8; paciencia: int = 2; semilla: int = 42; bf16: bool = True; checkpointing: bool = True; pesos_por_clase: bool = True; peso_relaciones: float = 1.0; peso_entidades: float = 1.0; peso_vigencia: float = 0.5` (peso de la pérdida de la cabeza de vigencia, configurable y aparte de `peso_relaciones`) `; congelar_capas_inferiores: int = 0; salida: str = "corridas"; evaluar_cada: int = 1` (épocas) `; fraccion_ancla: float = 0.0` (fracción de la primera ruta de entrenamiento que se mezcla como ancla; para la etapa 2).
 - `cargar_config(ruta: Path, **sobrescribir) -> Config`; `guardar_config(cfg, ruta)`.
 
 - [ ] **Paso 1: Test**
@@ -1140,6 +1178,7 @@ class Config:
     pesos_por_clase: bool = True
     peso_relaciones: float = 1.0
     peso_entidades: float = 1.0
+    peso_vigencia: float = 0.5
     congelar_capas_inferiores: int = 0
     salida: str = "corridas"
     evaluar_cada: int = 1
@@ -1242,7 +1281,7 @@ git commit -m "Añade la configuración de entrenamiento en YAML y las tres corr
 **Interfaces:**
 - En `decodificar.py`:
   - `decodificar_menciones(logits: Tensor [S, C+1], tramos: list[tuple[int, int]], cod: Codificacion, umbral_ninguno: float = 0.0) -> list[Mencion]`: por tramo, `argmax`; se descartan los `NINGUNO`; entre tramos solapados del **mismo tipo** gana el de mayor probabilidad (voraz por probabilidad descendente); los de tipos distintos pueden anidarse. Offsets de caracteres = `cod.palabras[i][0] + desplazamiento`… (ya vienen absolutos en `cod.palabras`). Devuelve `Mencion` con `confianza`.
-  - `decodificar_relaciones(logits: Tensor [R, C+1], pares: list[tuple[int, int]], grupos: list[Grupo], mascara_clases: BoolTensor [R, C], atencion: Tensor [R, T] | None, cod: Codificacion) -> list[Relacion]`: `decodificar_umbral` con máscara; una `Relacion` por clase positiva con `desglosar`; `confianza` de `confianzas`; `evidencia` = la oración (segmento entre `. `, `\n` o inicio/fin) que contiene la subpalabra de mayor peso en `atencion[r]`, si se pasa.
+  - `decodificar_relaciones(logits: Tensor [R, C+1], pares: list[tuple[int, int]], grupos: list[Grupo], mascara_clases: BoolTensor [R, C], atencion: Tensor [R, T] | None, cod: Codificacion, logits_vigencia: Tensor [R, 3] | None = None) -> list[Relacion]`: `decodificar_umbral` con máscara; una `Relacion` por clase positiva con `desglosar`; `confianza` de `confianzas`; `evidencia` = la oración (segmento entre `. `, `\n` o inicio/fin) que contiene la subpalabra de mayor peso en `atencion[r]`, si se pasa; `vigencia` = `VIGENCIAS[argmax(logits_vigencia[r])]` si se pasa, si no `"vigente"` (el valor por defecto de `Relacion`). Es una decisión por par, no por clase: todas las relaciones que salen del mismo par comparten la misma vigencia decodificada.
   - `oracion_de(texto: str, pos: int) -> tuple[int, int]`.
 - En `pipeline.py`:
   - `class Pipeline: __init__(modelo: ModeloEnrel, dispositivo: str = "cpu", max_len: int = 8192, solape: int = 512, alias: dict | None = None)`; `extraer(texto: str, meta: dict | None = None) -> Documento`; `extraer_documentos(docs: list[Documento]) -> list[Documento]` (reutiliza `doc.texto` y la meta; `fuente="modelo"`).
@@ -1295,9 +1334,11 @@ def test_decodificar_relaciones_con_mascara_y_evidencia():
     mascara[0, INDICE_CLASE["dirige"]] = False
     atencion = torch.zeros(1, len(cod.input_ids))
     atencion[0, cod.primera_subpalabra[2]] = 1.0    # «nombró»
-    rels = decodificar_relaciones(logits, [(0, 1)], grupos, mascara, atencion, cod)
+    logits_vigencia = torch.tensor([[0.0, 3.0, 0.0]])   # pasada
+    rels = decodificar_relaciones(logits, [(0, 1)], grupos, mascara, atencion, cod, logits_vigencia)
     assert len(rels) == 1 and rels[0].relacion == "nombro_a" and rels[0].cabeza == "e1"
     assert texto[rels[0].evidencia[0]:rels[0].evidencia[1]].strip() == "Gustavo Petro nombró a Reyes."
+    assert rels[0].vigencia == "pasada"
 
 
 def test_oracion_de():
@@ -1332,7 +1373,7 @@ def test_pipeline_produce_documento_valido():
 import torch
 
 from enrel.datos.documento import Grupo, Mencion, Relacion
-from enrel.esquema.tipos import CLASES_FINAS, TIPOS, desglosar
+from enrel.esquema.tipos import CLASES_FINAS, TIPOS, VIGENCIAS, desglosar
 from enrel.modelo.entidades import NINGUNO
 from enrel.modelo.perdidas import confianzas, decodificar_umbral
 from enrel.modelo.tokenizacion import Codificacion
@@ -1373,7 +1414,7 @@ def oracion_de(texto: str, pos: int) -> tuple[int, int]:
 
 
 def decodificar_relaciones(logits: torch.Tensor, pares: list[tuple[int, int]], grupos: list[Grupo], mascara_clases: torch.Tensor,
-                           atencion: torch.Tensor | None, cod: Codificacion) -> list[Relacion]:
+                           atencion: torch.Tensor | None, cod: Codificacion, logits_vigencia: torch.Tensor | None = None) -> list[Relacion]:
     positivas = decodificar_umbral(logits.float(), mascara_clases)
     conf = confianzas(logits.float())
     out = []
@@ -1387,9 +1428,11 @@ def decodificar_relaciones(logits: torch.Tensor, pares: list[tuple[int, int]], g
                 pos_local = cod.palabras[pal][0] - cod.desplazamiento
                 o_ini, o_fin = oracion_de(cod.texto, pos_local)
                 evidencia = (o_ini + cod.desplazamiento, o_fin + cod.desplazamiento)
+        # Vigencia: una decisión por par (viene de la cabeza pequeña aparte), no por clase.
+        vigencia = VIGENCIAS[int(logits_vigencia[r].argmax())] if logits_vigencia is not None else "vigente"
         for c in torch.nonzero(positivas[r]).flatten().tolist():
             relacion, atributo = desglosar(CLASES_FINAS[c])
-            out.append(Relacion(grupos[a].id, grupos[b].id, relacion, atributo, evidencia, round(float(conf[r, c]), 4)))
+            out.append(Relacion(grupos[a].id, grupos[b].id, relacion, atributo, evidencia, round(float(conf[r, c]), 4), vigencia=vigencia))
     return out
 ```
 
@@ -1424,7 +1467,7 @@ class Pipeline:
 
     def _lote(self, cod: Codificacion, tramos, menciones, tipos, pares, mascara) -> "Lote":
         ej = Ejemplo("x", cod.input_ids, cod.attention_mask, cod.primera_subpalabra, cod.ultima_subpalabra, tramos, [0] * len(tramos),
-                     menciones, tipos, pares, [[0] * C for _ in pares], mascara)
+                     menciones, tipos, pares, [[0] * C for _ in pares], mascara, [-100] * len(pares))
         return colar([ej], self.pad).a(self.disp)
 
     @torch.inference_mode()
@@ -1466,6 +1509,7 @@ class Pipeline:
             logits_max = torch.full((len(pares_todos), C + 1), float("-inf"))
             atencion_mejor = [None] * len(pares_todos)
             cod_mejor = [None] * len(pares_todos)
+            vigencia_mejor = [None] * len(pares_todos)
             for cod, estados in zip(cods, estados_por_ventana):
                 men_por_grupo = [[] for _ in grupos]
                 for m in menciones:
@@ -1479,16 +1523,18 @@ class Pipeline:
                 idx_pares = [pares_todos.index(p) for p in pares]
                 men_rellenas = [ms if ms else [0] for ms in men_por_grupo]
                 lote = self._lote(cod, [(0, 0)], men_rellenas, tipos, pares, [mascara[i].tolist() for i in idx_pares])
-                logits = self.m.relaciones(estados, lote.attention_mask.bool(), lote.menciones, lote.mascara_menciones,
-                                           lote.pares, lote.mascara_pares)[0].cpu()
+                logits, logits_vig = self.m.relaciones(estados, lote.attention_mask.bool(), lote.menciones, lote.mascara_menciones,
+                                                        lote.pares, lote.mascara_pares)
+                logits, logits_vig = logits[0].cpu(), logits_vig[0].cpu()
                 atencion = self.m.relaciones.ultima_atencion[0].cpu()
                 for r, i in enumerate(idx_pares):
                     if logits[r].max() > logits_max[i].max():
-                        atencion_mejor[i], cod_mejor[i] = atencion[r:r + 1], cod
+                        atencion_mejor[i], cod_mejor[i], vigencia_mejor[i] = atencion[r:r + 1], cod, logits_vig[r:r + 1]
                     logits_max[i] = torch.maximum(logits_max[i], logits[r])
             validos = [i for i in range(len(pares_todos)) if torch.isfinite(logits_max[i]).all()]
             for i in validos:
-                relaciones += decodificar_relaciones(logits_max[i:i + 1], [pares_todos[i]], grupos, mascara[i:i + 1], atencion_mejor[i], cod_mejor[i])
+                relaciones += decodificar_relaciones(logits_max[i:i + 1], [pares_todos[i]], grupos, mascara[i:i + 1], atencion_mejor[i],
+                                                      cod_mejor[i], vigencia_mejor[i])
         por_id = {g.id: g for g in grupos}
         relaciones, _ = filtrar_relaciones(relaciones, por_id)
         # 4. Colapsar simétricas duplicadas (a→b y b→a con la misma clase): filtrar_relaciones ya quita espejos.
@@ -1533,8 +1579,8 @@ git commit -m "Añade la decodificación y el pipeline de inferencia de extremo 
   3. Modelo: `ModeloEnrel.cargar(cfg.punto_de_partida)` si hay, si no `ModeloEnrel(ConfigModelo(backbone=cfg.backbone, max_ancho=cfg.max_ancho, max_grupos=cfg.max_grupos), checkpointing=cfg.checkpointing)`. Si `cfg.congelar_capas_inferiores > 0`, `requires_grad=False` en las embeddings y en las primeras N capas (`modelo.backbone.layers[:N]` para ModernBERT; `encoder.layer[:N]` para BERT; buscar el atributo que exista).
   4. Pesos por clase: `pesos_por_frecuencia(conteo_clases(train))` si `cfg.pesos_por_clase`.
   5. Optimizador `AdamW` con dos grupos (`parametros_por_grupo`, lr respectivo, `weight_decay`); scheduler lineal con `warmup` sobre `pasos_totales = ceil(len(train) / (lote × acumulacion)) × epocas`.
-  6. Época: barajar; `ejemplo_desde_documento` por documento (con `rng` por época, así los negativos cambian); `colar` en lotes de `cfg.lote`; `autocast(bfloat16)` si `cfg.bf16` y hay CUDA; `perdida = peso_entidades × perdida_entidades + peso_relaciones × perdida_umbral_adaptativo` (esta última solo si hay pares); dividir por `acumulacion`; `backward`; cada `acumulacion` lotes: `clip_grad_norm_(1.0)`, `step`, `scheduler.step`, `zero_grad`. Registrar pérdida media por época.
-  7. Cada `evaluar_cada` épocas: `Pipeline(modelo, dispositivo, max_len=cfg.max_len)` sobre desarrollo → `evaluar_entidades` estricto y `evaluar_relaciones` RE+ → escribe `metricas.jsonl` (época, pérdidas, F1 entidades, RE+, fina, tiempo) y `evaluacion-desarrollo.md` con `informe_completo` de la mejor época. Si RE+ mejora, `guardar` en `mejor/`; si no mejora en `paciencia` evaluaciones, parar.
+  6. Época: barajar; `ejemplo_desde_documento` por documento (con `rng` por época, así los negativos cambian); `colar` en lotes de `cfg.lote`; `autocast(bfloat16)` si `cfg.bf16` y hay CUDA; `perdida = peso_entidades × perdida_entidades + peso_relaciones × perdida_umbral_adaptativo + peso_vigencia × perdida_vigencia` (las dos últimas solo si hay pares); dividir por `acumulacion`; `backward`; cada `acumulacion` lotes: `clip_grad_norm_(1.0)`, `step`, `scheduler.step`, `zero_grad`. Registrar pérdida media por época.
+  7. Cada `evaluar_cada` épocas: `Pipeline(modelo, dispositivo, max_len=cfg.max_len)` sobre desarrollo → `evaluar_entidades` estricto y `evaluar_relaciones` RE+ → escribe `metricas.jsonl` (época, pérdidas, F1 entidades, RE+, fina, tasa de vigencia, tiempo) y `evaluacion-desarrollo.md` con `informe_completo` de la mejor época. La vigencia es informativa (no decide la parada ni el mejor checkpoint, igual que en la puerta de la etapa 1). Si RE+ mejora, `guardar` en `mejor/`; si no mejora en `paciencia` evaluaciones, parar.
   8. Al final: `resumen.json`.
 - CLI `enrel entrenar --config configs/etapa1-plata.yaml [--semilla 7] [--nombre x] [--dispositivo cuda]` (las opciones sobrescriben el YAML).
 
@@ -1568,7 +1614,7 @@ def test_entrenar_dos_epocas_cpu(tmp_path: Path):
     assert (d / "config.yaml").exists() and (d / "hashes.json").exists() and (d / "mejor" / "cabezas.safetensors").exists()
     metricas = [json.loads(l) for l in (d / "metricas.jsonl").read_text().splitlines()]
     assert len(metricas) == 2 and metricas[1]["perdida"] <= metricas[0]["perdida"] * 1.5
-    assert "re_mas" in metricas[0]
+    assert "re_mas" in metricas[0] and "vigencia" in metricas[0]
 ```
 
 - [ ] **Paso 2: Implementar `enrel/entrenamiento/bucle.py`**
@@ -1596,7 +1642,7 @@ from enrel.evaluacion.informe import informe_completo
 from enrel.evaluacion.relaciones import evaluar_relaciones
 from enrel.inferencia.pipeline import Pipeline
 from enrel.modelo.enrel import ConfigModelo, ModeloEnrel
-from enrel.modelo.perdidas import perdida_entidades, perdida_umbral_adaptativo, pesos_por_frecuencia
+from enrel.modelo.perdidas import perdida_entidades, perdida_umbral_adaptativo, perdida_vigencia, pesos_por_frecuencia
 
 
 def _semilla(s: int) -> None:
@@ -1633,10 +1679,14 @@ def _evaluar(modelo, dev, dispositivo, max_len):
     pipeline = Pipeline(modelo, dispositivo, max_len=max_len)
     pred = pipeline.extraer_documentos(dev)
     ent = evaluar_entidades(dev, pred, "estricto")["__global__"].f1
-    re_mas = evaluar_relaciones(dev, pred, "gruesa", exigir_tipos=True)["__micro__"].f1
+    re_mas_dict = evaluar_relaciones(dev, pred, "gruesa", exigir_tipos=True)
+    re_mas = re_mas_dict["__micro__"].f1
     fina = evaluar_relaciones(dev, pred, "fina", exigir_tipos=True)["__micro__"].f1
+    # Vigencia: informativa, no entra en la condición de acierto de RE+ (§8 de la spec).
+    vig = re_mas_dict["__vigencia__"]
+    vigencia = vig.tp / (vig.tp + vig.fn) if vig.tp + vig.fn else 1.0
     modelo.train()
-    return {"entidades": ent, "re_mas": re_mas, "fina": fina}, pred
+    return {"entidades": ent, "re_mas": re_mas, "fina": fina, "vigencia": vigencia}, pred
 
 
 def entrenar(cfg: Config, dispositivo: str | None = None) -> dict:
@@ -1694,6 +1744,8 @@ def entrenar(cfg: Config, dispositivo: str | None = None) -> dict:
                     if salida["logits_relaciones"] is not None:
                         perdida = perdida + cfg.peso_relaciones * perdida_umbral_adaptativo(
                             salida["logits_relaciones"].float(), lote.etiquetas_pares, lote.mascara_pares, pesos)
+                        perdida = perdida + cfg.peso_vigencia * perdida_vigencia(
+                            salida["logits_vigencia"].float(), lote.etiquetas_vigencia)
                 (perdida / cfg.acumulacion).backward()
                 perdidas.append(float(perdida))
                 n_lotes += 1
@@ -1739,7 +1791,7 @@ Corregir al implementar la línea `perdidas, n_lotes, opt.zero_grad(set_to_none=
 ```bash
 uv run pytest tests/test_entrenamiento_bucle.py -q
 git add enrel/entrenamiento/bucle.py enrel/entrenamiento/cli_entrenar.py enrel/_subcomandos.py tests/test_entrenamiento_bucle.py
-git commit -m "Añade el bucle de entrenamiento con evaluación por época y parada por RE+"
+git commit -m "Añade el bucle de entrenamiento con la pérdida de vigencia, evaluación por época y parada por RE+"
 ```
 
 ---
@@ -1855,7 +1907,7 @@ if [ -f datos/conjuntos/prueba_dirigida.jsonl ]; then
 fi
 ```
 
-Correr para las dos semillas. Escribir `docs/resultados/etapa-2.md` con: la tabla de la spec §8 con las tres filas obligatorias (línea base GLiNER de la etapa 1, techo del maestro de la etapa 1, modelo por semilla) sobre la prueba, con intervalos; media y diferencia entre semillas; F1 por relación fina con la regla n ≥ 10; la tabla de prueba dirigida aparte; positivos por clase en entrenamiento; horas de GPU; hashes; y la comparación con legajo (0,86 a 0,88 entidades por solape, 0,47 a 0,52 relaciones).
+Correr para las dos semillas. Escribir `docs/resultados/etapa-2.md` con: la tabla de la spec §8 con las tres filas obligatorias (línea base GLiNER de la etapa 1, techo del maestro de la etapa 1, modelo por semilla) sobre la prueba, con intervalos; media y diferencia entre semillas; F1 por relación fina con la regla n ≥ 10; la tabla de prueba dirigida aparte; positivos por clase en entrenamiento; horas de GPU; hashes; y la comparación con legajo (0,86 a 0,88 entidades por solape, 0,47 a 0,52 relaciones). Añadir la fila «vigencia (tasa = R)» de §8 con la tasa del modelo, y al lado, como línea base a batir, la misma regla léxica sobre la oración de evidencia que ya usa el maestro para proponerla («ex», «fue», «entonces», «exministro», «asumirá», «será»: pasada o futura según la marca, vigente si ninguna aplica) medida sobre las mismas relaciones acertadas de la prueba.
 
 - [ ] **Paso 4: Criterio de salida**
 
@@ -1872,7 +1924,7 @@ git commit -m "Cierra la etapa 2: primer modelo entrenado con plata y evaluado c
 
 ## Autorrevisión del plan de la etapa 2
 
-**Cobertura de la spec.** §4.1 backbone y respaldo → 2.2 (y 0.16). §4.2 cabeza de tramos hasta 16 palabras, anidamiento entre tipos, negativos 8:1 → 2.3, 2.7, 2.10. §4.3 agrupación por reglas con alias opcional → reutiliza 0.6 en 2.10. §4.4 cabeza de pares con logsumexp, contexto local, bilineal agrupado de 64, 25 clases más TH, máscara de tipos, pérdida de umbral adaptativo con reponderación de cola larga, decodificación por TH, evidencia, tope de 60 grupos → 2.4, 2.5, 2.6, 2.7, 2.10. §4.5 salida JSON → `Documento` y `predecir-conjunto`; el exportador FtM va en la etapa 3. §7 receta (bf16, checkpointing, lote 2×8, 4.096, lr, épocas, paciencia, semillas, trazabilidad, cordura) → 2.9, 2.11, 2.12, 2.13. §8 tabla con tres filas e Ign-F1 → 2.13. §10 etapa 2 criterio de salida → 2.13.
+**Cobertura de la spec.** §4.1 backbone y respaldo → 2.2 (y 0.16). §4.2 cabeza de tramos hasta 16 palabras, anidamiento entre tipos, negativos 8:1 → 2.3, 2.7, 2.10. §4.3 agrupación por reglas con alias opcional → reutiliza 0.6 en 2.10. §4.4 cabeza de pares con logsumexp, contexto local, bilineal agrupado de 64, 25 clases más TH, cabeza de vigencia aparte, máscara de tipos, pérdida de umbral adaptativo con reponderación de cola larga, decodificación por TH, evidencia, tope de 60 grupos → 2.4, 2.5, 2.6, 2.7, 2.10. §4.5 salida JSON → `Documento` y `predecir-conjunto`; el exportador FtM va en la etapa 3. §7 receta (bf16, checkpointing, lote 2×8, 4.096, lr, épocas, paciencia, semillas, trazabilidad, cordura) → 2.9, 2.11, 2.12, 2.13. §8 tabla con tres filas e Ign-F1 → 2.13. §10 etapa 2 criterio de salida → 2.13.
 
 **Tipos y firmas.** `Codificacion` (2.1) con `palabras`, `primera_subpalabra`, `ultima_subpalabra`, `desplazamiento`, `texto` la usan 2.7 y 2.10. `Ejemplo` (2.7) y `Lote` (2.8) con los mismos campos los consume `ModeloEnrel.forward` (2.6) y `Pipeline` (2.10). `CabezaRelaciones.forward(estados, mascara_tokens, menciones, mascara_menciones, pares, mascara_pares)` (2.4) coincide con la llamada en 2.6 y 2.10. `decodificar_umbral(logits, mascara)` y `confianzas` (2.5) las usa 2.10. `mascara_tipos` (2.6) la usan 2.7 y 2.10. `Config` (2.9) la consume `entrenar` (2.11) y `cordura` (2.12).
 

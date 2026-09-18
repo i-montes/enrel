@@ -1,13 +1,20 @@
-"""El esquema de enrel: siete tipos de entidad, diecisiete relaciones y una de reserva.
+"""El esquema de enrel: cinco tipos de entidad, dieciocho relaciones y una de reserva.
 
 Fuente: docs/superpowers/specs/2026-09-16-enrel-diseno.md §3. Las definiciones en prosa
 viven en docs/guia-anotacion.md; aquí solo la estructura que el código necesita.
+
+`monto` y `obra` salieron del esquema (decisión del 2026-09-17): sobre el oro de 125
+documentos, `monto` no participa de ninguna de las 18 relaciones (0 aristas) y `obra` solo
+aparece en `vinculo_sin_tipo`, mezclando nombres de secciones propias de un solo medio con
+películas mencionadas al pasar. Legajo conserva sus 7 tipos; es el exportador de enrel
+(`enrel/anotacion/desde_legajo.py`) el que descarta estos dos grupos y las relaciones que
+los tocan, con el mismo mecanismo que ya descartaba el tipo `evento`.
 """
 
 from dataclasses import dataclass
 
-TIPOS: tuple[str, ...] = ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto")
-P, O, L, C, N, B, M = TIPOS  # noqa: E741 — nombres de una letra exigidos por la interfaz del esquema
+TIPOS: tuple[str, ...] = ("persona", "organizacion", "lugar", "cargo", "norma")
+P, O, L, C, N = TIPOS  # noqa: E741 — nombres de una letra exigidos por la interfaz del esquema
 
 
 @dataclass(frozen=True)
@@ -25,7 +32,7 @@ def _r(nombre, desde, hasta, simetrica=False, atributos=(), familia=""):
 
 
 _LISTA = [
-    _r("ocupa_cargo", [P], [C], atributos=("actual", "anterior", "aspirante"), familia="A"),
+    _r("ocupa_cargo", [P], [C], atributos=("titular", "aspirante"), familia="A"),
     _r("nombro_a", [P, O], [P], familia="A"),
     _r("sucedio_a", [P], [P], familia="A"),
     _r("trabaja_en", [P], [O], familia="A"),
@@ -38,13 +45,14 @@ _LISTA = [
     _r("contrato_a", [O, P], [O, P], familia="B"),
     _r("financia_a", [P, O], [P, O], familia="B"),
     _r("familiar_de", [P], [P], simetrica=True, atributos=("conyuge", "hijo_de", "hermano", "otro"), familia="C"),
-    _r("apoya_a", [P, O], [P, O, C], familia="C"),
-    _r("se_opone_a", [P, O], [P, O], familia="C"),
+    _r("apoya_a", [P, O], [P, O, C, N], familia="C"),
+    _r("impulsa_norma", [P, O], [N], familia="C"),
+    _r("se_opone_a", [P, O], [P, O, N], familia="C"),
     _r("investigado_por", [P, O], [O], atributos=("investigado", "acusado", "condenado"), familia="C"),
     _r("ubicado_en", [P, O, L], [L], familia="C"),
 ]
 RELACIONES: dict[str, DefRelacion] = {d.nombre: d for d in _LISTA}
-assert len(RELACIONES) == 17
+assert len(RELACIONES) == 18
 
 SIN_TIPO = "vinculo_sin_tipo"
 RELACIONES_Y_SIN_TIPO: tuple[str, ...] = tuple(RELACIONES) + (SIN_TIPO,)
@@ -52,6 +60,21 @@ RELACIONES_Y_SIN_TIPO: tuple[str, ...] = tuple(RELACIONES) + (SIN_TIPO,)
 FAMILIAS: dict[str, tuple[str, ...]] = {
     fam: tuple(d.nombre for d in _LISTA if d.familia == fam) for fam in ("A", "B", "C")
 }
+
+# La vigencia temporal es un eje propio de toda relación (no solo de ocupa_cargo): cuándo
+# afirma el texto que el vínculo se sostiene. «vigente» por defecto porque la mayoría de las
+# relaciones anotadas lo son y los ficheros ya escritos, sin este campo, deben leerse así.
+VIGENCIAS: tuple[str, ...] = ("vigente", "pasada", "futura")
+VIGENCIA_POR_DEFECTO = "vigente"
+
+# Relaciones que describen un suceso puntual, no un estado que se sostiene en el tiempo: la
+# vigencia rara vez aplica («nombró a» no está ni «vigente» ni «pasado» ejerciéndose, ocurrió
+# una vez). Es informativa para la guía y el prompt del maestro; no restringe el esquema.
+_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a", "impulsa_norma"})
+
+
+def es_suceso(relacion: str) -> bool:
+    return relacion in _SUCESOS
 
 
 def clase_fina(relacion: str, atributo: str | None) -> str:

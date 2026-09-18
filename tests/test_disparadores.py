@@ -11,3 +11,10 @@ def test_relaciones_disparadas():
     d = relaciones_disparadas(t)
     assert {"ocupa_cargo", "investigado_por", "familiar_de", "propietario_de", "ubicado_en"} <= d
     assert "sucedio_a" not in d
+
+
+def test_relaciones_disparadas_impulsa_norma():
+    t = "El senador radicó el proyecto y logró sacar adelante la reforma tributaria."
+    d = relaciones_disparadas(t)
+    assert "impulsa_norma" in d
+    assert "apoya_a" not in d

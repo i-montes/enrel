@@ -2,12 +2,17 @@ from enrel.esquema import tipos as t
 
 
 def test_tipos_y_constantes():
-    assert t.TIPOS == ("persona", "organizacion", "lugar", "cargo", "norma", "obra", "monto")
-    assert (t.P, t.O, t.L, t.C, t.N, t.B, t.M) == t.TIPOS
+    # `monto` y `obra` salieron del esquema (decisión del 2026-09-17): sobre el oro de 125
+    # documentos, `monto` no tenía ninguna relación y `obra` solo aparecía en
+    # `vinculo_sin_tipo`, mezclada con nombres de secciones de un solo medio.
+    assert t.TIPOS == ("persona", "organizacion", "lugar", "cargo", "norma")
+    assert "obra" not in t.TIPOS
+    assert "monto" not in t.TIPOS
+    assert (t.P, t.O, t.L, t.C, t.N) == t.TIPOS
 
 
-def test_hay_17_relaciones_y_25_clases_finas():
-    assert len(t.RELACIONES) == 17
+def test_hay_18_relaciones_y_25_clases_finas():
+    assert len(t.RELACIONES) == 18
     assert t.SIN_TIPO not in t.RELACIONES
     assert len(t.CLASES_FINAS) == 25
     assert t.CLASES_FINAS[-1] == t.SIN_TIPO
@@ -15,7 +20,9 @@ def test_hay_17_relaciones_y_25_clases_finas():
 
 
 def test_clase_fina_y_desglosar():
-    assert t.clase_fina("ocupa_cargo", "actual") == "ocupa_cargo:actual"
+    assert t.clase_fina("ocupa_cargo", "titular") == "ocupa_cargo:titular"
+    assert t.clase_fina("ocupa_cargo", "aspirante") == "ocupa_cargo:aspirante"
+    assert t.clase_fina("familiar_de", "hijo_de") == "familiar_de:hijo_de"
     assert t.clase_fina("dirige", None) == "dirige"
     assert t.desglosar("familiar_de:hijo_de") == ("familiar_de", "hijo_de")
     assert t.desglosar("trabaja_en") == ("trabaja_en", None)
@@ -23,10 +30,29 @@ def test_clase_fina_y_desglosar():
 
 
 def test_atributos():
-    assert t.RELACIONES["ocupa_cargo"].atributos == ("actual", "anterior", "aspirante")
+    # `ocupa_cargo` tiene un atributo de modalidad (titular/aspirante), ortogonal a la vigencia:
+    # ese eje (`vigencia`) es propio de toda relación (véase test_datos_documento.py).
+    assert t.RELACIONES["ocupa_cargo"].atributos == ("titular", "aspirante")
     assert t.RELACIONES["familiar_de"].atributos == ("conyuge", "hijo_de", "hermano", "otro")
     assert t.RELACIONES["investigado_por"].atributos == ("investigado", "acusado", "condenado")
     assert t.RELACIONES["trabaja_en"].atributos == ()
+
+
+def test_vigencias_y_defecto():
+    assert t.VIGENCIAS == ("vigente", "pasada", "futura")
+    assert t.VIGENCIA_POR_DEFECTO == "vigente"
+
+
+def test_es_suceso():
+    assert t.es_suceso("nombro_a")
+    assert t.es_suceso("sucedio_a")
+    assert t.es_suceso("fundo")
+    assert t.es_suceso("contrato_a")
+    assert t.es_suceso("financia_a")
+    assert t.es_suceso("impulsa_norma")
+    assert not t.es_suceso("ocupa_cargo")
+    assert not t.es_suceso("dirige")
+    assert not t.es_suceso(t.SIN_TIPO)
 
 
 def test_admite():
@@ -35,9 +61,18 @@ def test_admite():
     assert t.admite("parte_de", "organizacion", "organizacion")
     assert not t.admite("parte_de", "persona", "organizacion")
     assert t.admite("ubicado_en", "lugar", "lugar")
-    assert not t.admite("ubicado_en", "monto", "lugar")
+    assert not t.admite("ubicado_en", "cargo", "lugar")
     assert t.admite("apoya_a", "organizacion", "cargo")
-    assert t.admite(t.SIN_TIPO, "monto", "obra")
+    assert t.admite("apoya_a", "persona", "norma")
+    assert t.admite("se_opone_a", "organizacion", "norma")
+    assert not t.admite("investigado_por", "persona", "norma")
+    assert t.admite(t.SIN_TIPO, "persona", "norma")
+    # impulsa_norma: acto legislativo (radicar, redactar, ser ponente, sacar adelante,
+    # sancionar, aprobar) de persona u organización sobre una norma; direccional, no al revés.
+    assert t.admite("impulsa_norma", "persona", "norma")
+    assert t.admite("impulsa_norma", "organizacion", "norma")
+    assert not t.admite("impulsa_norma", "persona", "cargo")
+    assert not t.admite("impulsa_norma", "norma", "persona")
 
 
 def test_relaciones_admitidas_persona_persona():

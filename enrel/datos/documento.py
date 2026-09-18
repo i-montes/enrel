@@ -33,6 +33,7 @@ class Relacion:
     cola: str
     relacion: str
     atributo: str | None = None
+    vigencia: str = "vigente"
     evidencia: tuple[int, int] | None = None
     confianza: float | None = None
 
@@ -81,6 +82,7 @@ class Documento:
                     r["cola"],
                     r["relacion"],
                     r.get("atributo"),
+                    r.get("vigencia") or "vigente",  # compatibilidad: ficheros escritos antes de este campo
                     None if ev is None else (ev["ini"], ev["fin"]),
                     r.get("confianza"),
                 )

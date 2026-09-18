@@ -81,9 +81,9 @@ git commit -m "Etapa 3: segunda etapa con oro, barrido corto y backbone alternat
 - Test: `tests/test_exportar_onnx.py` (CPU, tiny-bert)
 
 **Interfaces:**
-- `exportar_modelo(modelo: ModeloEnrel, directorio: Path, opset: int = 17) -> dict`: escribe `codificador.onnx` (entradas `input_ids [B,T]`, `attention_mask [B,T]`; salida `estados [B,T,H]`), `entidades.onnx` (entradas `estados`, `primera [B,P]`, `ultima [B,P]`, `tramos [B,S,2]`, `mascara_tramos [B,S]`; salida `logits_entidades [B,S,8]`), `relaciones.onnx` (entradas `estados`, `mascara_tokens [B,T]`, `menciones [B,G,M]`, `mascara_menciones [B,G,M]`, `pares [B,R,2]`, `mascara_pares [B,R]`; salidas `logits_relaciones [B,R,26]` y `atencion [B,R,T]`), todos con ejes dinámicos, y `meta.json` con la `ConfigModelo`, `CLASES_FINAS`, `TIPOS`, el nombre del tokenizer (se copia `backbone/` con solo los ficheros del tokenizer) y `opset`. Devuelve tamaños en MB y la diferencia máxima entre torch y ONNX sobre una entrada real (`{"codificador": 1e-4, …}`).
+- `exportar_modelo(modelo: ModeloEnrel, directorio: Path, opset: int = 17) -> dict`: escribe `codificador.onnx` (entradas `input_ids [B,T]`, `attention_mask [B,T]`; salida `estados [B,T,H]`), `entidades.onnx` (entradas `estados`, `primera [B,P]`, `ultima [B,P]`, `tramos [B,S,2]`, `mascara_tramos [B,S]`; salida `logits_entidades [B,S,6]`), `relaciones.onnx` (entradas `estados`, `mascara_tokens [B,T]`, `menciones [B,G,M]`, `mascara_menciones [B,G,M]`, `pares [B,R,2]`, `mascara_pares [B,R]`; salidas `logits_relaciones [B,R,26]`, `atencion [B,R,T]` y `logits_vigencia [B,R,3]`), todos con ejes dinámicos, y `meta.json` con la `ConfigModelo`, `CLASES_FINAS`, `TIPOS`, el nombre del tokenizer (se copia `backbone/` con solo los ficheros del tokenizer) y `opset`. Devuelve tamaños en MB y la diferencia máxima entre torch y ONNX sobre una entrada real (`{"codificador": 1e-4, …}`).
 - El codificador se exporta desde una instancia cargada con `atencion="eager"` (ModernBERT con `sdpa`/flash no exporta); las cabezas desde el mismo modelo.
-- `CabezaRelaciones.forward_exportable(...)` devuelve `(logits, atencion)` sin escribir `self.ultima_atencion`.
+- `CabezaRelaciones.forward_exportable(...)` devuelve `(logits, atencion, logits_vigencia)` sin escribir `self.ultima_atencion`.
 - Subcomando `enrel exportar-onnx --modelo DIR --salida DIR_ONNX`.
 
 - [ ] **Paso 1: Test**
@@ -112,7 +112,7 @@ def test_exportar_tres_grafos(tmp_path: Path):
 
 - [ ] **Paso 2: Implementar**
 
-En `enrel/modelo/relaciones.py`, extraer el cuerpo de `forward` a `forward_exportable(...) -> tuple[Tensor, Tensor]` que devuelve `(logits, atencion)`; `forward` lo llama, guarda `self.ultima_atencion = atencion.detach()` y devuelve `logits`.
+En `enrel/modelo/relaciones.py`, extraer el cuerpo de `forward` a `forward_exportable(...) -> tuple[Tensor, Tensor, Tensor]` que devuelve `(logits, atencion, logits_vigencia)`; `forward` lo llama, guarda `self.ultima_atencion = atencion.detach()` y devuelve `(logits, logits_vigencia)` (la firma ya establecida en la etapa 2, Tarea 2.4).
 
 `enrel/exportar/onnx.py`:
 
@@ -203,17 +203,17 @@ def exportar_modelo(modelo: ModeloEnrel, directorio: Path, opset: int = 17) -> d
     masc_p = torch.ones(1, 3, dtype=torch.bool)
     rel = _Relaciones(modelo.relaciones)
     with torch.no_grad():
-        lr, at = rel(estados, mask.bool(), menciones, masc_m, pares, masc_p)
+        lr, at, lrv = rel(estados, mask.bool(), menciones, masc_m, pares, masc_p)
     torch.onnx.export(rel, (estados, mask.bool(), menciones, masc_m, pares, masc_p), str(directorio / "relaciones.onnx"),
                       input_names=["estados", "mascara_tokens", "menciones", "mascara_menciones", "pares", "mascara_pares"],
-                      output_names=["logits_relaciones", "atencion"], opset_version=opset,
+                      output_names=["logits_relaciones", "atencion", "logits_vigencia"], opset_version=opset,
                       dynamic_axes={"estados": {0: "B", 1: "T"}, "mascara_tokens": {0: "B", 1: "T"}, "menciones": {0: "B", 1: "G", 2: "M"},
                                     "mascara_menciones": {0: "B", 1: "G", 2: "M"}, "pares": {0: "B", 1: "R"}, "mascara_pares": {0: "B", 1: "R"},
-                                    "logits_relaciones": {0: "B", 1: "R"}, "atencion": {0: "B", 1: "R", 2: "T"}})
+                                    "logits_relaciones": {0: "B", 1: "R"}, "atencion": {0: "B", 1: "R", 2: "T"}, "logits_vigencia": {0: "B", 1: "R"}})
     s = _sesion(directorio / "relaciones.onnx")
-    lr_onnx, _ = s.run(None, {"estados": estados.numpy(), "mascara_tokens": mask.bool().numpy(), "menciones": menciones.numpy(),
-                              "mascara_menciones": masc_m.numpy(), "pares": pares.numpy(), "mascara_pares": masc_p.numpy()})
-    dif["relaciones"] = float(np.abs(lr_onnx - lr.numpy()).max())
+    lr_onnx, _, lrv_onnx = s.run(None, {"estados": estados.numpy(), "mascara_tokens": mask.bool().numpy(), "menciones": menciones.numpy(),
+                                        "mascara_menciones": masc_m.numpy(), "pares": pares.numpy(), "mascara_pares": masc_p.numpy()})
+    dif["relaciones"] = max(float(np.abs(lr_onnx - lr.numpy()).max()), float(np.abs(lrv_onnx - lrv.numpy()).max()))
 
     # 4. Tokenizer y meta
     tok.save_pretrained(directorio / "backbone")
@@ -248,7 +248,7 @@ Si la exportación del codificador falla con ModernBERT por operadores no soport
 
 **Interfaces:**
 - `class PipelineONNX: __init__(directorio: Path, hilos: int = 4, max_len: int = 8192, solape: int = 512, alias: dict | None = None)`: carga `meta.json`, el tokenizer de `backbone/`, y tres `InferenceSession` con `intra_op_num_threads = hilos` (busca `codificador-int8.onnx` si `meta["precision"] == "int8"`, etc.). `extraer(texto, meta=None) -> Documento` y `extraer_documentos(docs)` con **la misma lógica** que `Pipeline` (Tarea 2.10) pero con numpy: para no duplicar la lógica, refactorizar `Pipeline` en la etapa 2 de modo que los pasos de decodificación, agrupación, recorte y agregación estén en funciones puras que reciben arrays (`decodificar_menciones` ya recibe tensores; aceptar `numpy` convirtiendo con `torch.from_numpy` es aceptable porque `torch` sigue instalado en desarrollo, **pero** el pipeline ONNX publicado no debe importar torch). Decisión: `onnx_pipeline.py` reimplementa `decodificar_menciones` y `decodificar_umbral`/`confianzas` en numpy (`_decodificar_menciones_np`, `_decodificar_relaciones_np`) y reutiliza `agrupar`, `filtrar_*`, `ventanas`, `enumerar_tramos` (devuelve lista) y `mascara_tipos` (convertir a numpy con `.numpy()`; `mascara_tipos` vive en `modelo/enrel.py`, que importa torch: mover `TABLA_TIPOS` y `mascara_tipos` a `enrel/esquema/mascaras.py` **sin torch**, devolviendo `numpy.ndarray`, y hacer que `modelo/enrel.py` la envuelva con `torch.from_numpy`). Esta refactorización es parte de la tarea.
-- Test de equivalencia: `Pipeline` (torch) y `PipelineONNX` sobre el mismo texto y el mismo modelo tiny producen el mismo `Documento` (menciones, grupos y relaciones iguales; confianzas con tolerancia 1e-3).
+- Test de equivalencia: `Pipeline` (torch) y `PipelineONNX` sobre el mismo texto y el mismo modelo tiny producen el mismo `Documento` (menciones, grupos, relaciones y su vigencia iguales; confianzas con tolerancia 1e-3). `relaciones.onnx` tiene ahora tres salidas (`logits_relaciones`, `atencion`, `logits_vigencia`); `PipelineONNX` decodifica la vigencia por par con `VIGENCIAS[argmax(logits_vigencia)]`, igual que `Pipeline`.
 
 - [ ] **Paso 1: Test**
 
@@ -272,7 +272,7 @@ def test_onnx_equivale_a_torch(tmp_path: Path):
     a = Pipeline(m, max_len=96, solape=8).extraer(texto, {"doc_id": "x"})
     b = PipelineONNX(tmp_path, hilos=2, max_len=96, solape=8).extraer(texto, {"doc_id": "x"})
     assert [(x.ini, x.fin, x.tipo, x.grupo) for x in a.menciones] == [(x.ini, x.fin, x.tipo, x.grupo) for x in b.menciones]
-    assert {(r.cabeza, r.cola, r.relacion, r.atributo) for r in a.relaciones} == {(r.cabeza, r.cola, r.relacion, r.atributo) for r in b.relaciones}
+    assert {(r.cabeza, r.cola, r.relacion, r.atributo, r.vigencia) for r in a.relaciones} == {(r.cabeza, r.cola, r.relacion, r.atributo, r.vigencia) for r in b.relaciones}
 ```
 
 - [ ] **Paso 2: Implementar**
@@ -296,7 +296,7 @@ from enrel.datos.documento import Documento, Mencion, Relacion
 from enrel.datos.normalizar import nfc
 from enrel.datos.validar import validar_documento
 from enrel.esquema.mascaras import mascara_tipos
-from enrel.esquema.tipos import CLASES_FINAS, TIPOS, desglosar
+from enrel.esquema.tipos import CLASES_FINAS, TIPOS, VIGENCIAS, desglosar
 from enrel.inferencia.decodificar import oracion_de
 from enrel.maestro.filtros import filtrar_menciones, filtrar_relaciones
 from enrel.modelo.tokenizacion import Codificacion, palabra_de, ventanas
@@ -389,6 +389,7 @@ class PipelineONNX:
             masc = mascara_tipos([tipos[a] for a, _ in pares_todos], [tipos[b] for _, b in pares_todos])
             logits_max = np.full((len(pares_todos), C + 1), -np.inf, dtype=np.float32)
             evidencia_mejor: list[tuple[int, int] | None] = [None] * len(pares_todos)
+            vigencia_mejor: list[str] = ["vigente"] * len(pares_todos)
             for cod, est in zip(cods, estados):
                 por_grupo = [[] for _ in grupos]
                 for m in menciones:
@@ -405,7 +406,7 @@ class PipelineONNX:
                 for k, ms in enumerate(por_grupo):
                     men[0, k, :len(ms)] = ms
                     mm[0, k, :len(ms)] = True
-                logits, atencion = self.s_rel.run(None, {
+                logits, atencion, logits_vig = self.s_rel.run(None, {
                     "estados": est, "mascara_tokens": np.array([cod.attention_mask], dtype=bool), "menciones": men, "mascara_menciones": mm,
                     "pares": np.array([pares], dtype=np.int64), "mascara_pares": np.ones((1, len(pares)), dtype=bool)})
                 for r, p in enumerate(pares):
@@ -416,6 +417,7 @@ class PipelineONNX:
                         if pal is not None:
                             o = oracion_de(cod.texto, cod.palabras[pal][0] - cod.desplazamiento)
                             evidencia_mejor[i] = (o[0] + cod.desplazamiento, o[1] + cod.desplazamiento)
+                        vigencia_mejor[i] = VIGENCIAS[int(logits_vig[0, r].argmax())]
                     logits_max[i] = np.maximum(logits_max[i], logits[0, r])
             for i, (a, b) in enumerate(pares_todos):
                 if not np.isfinite(logits_max[i]).all():
@@ -425,7 +427,8 @@ class PipelineONNX:
                 conf = 1 / (1 + np.exp(-(logits_max[i, :C] - th)))
                 for c in np.nonzero(clases > th)[0].tolist():
                     rel, atr = desglosar(CLASES_FINAS[c])
-                    relaciones.append(Relacion(grupos[a].id, grupos[b].id, rel, atr, evidencia_mejor[i], round(float(conf[c]), 4)))
+                    relaciones.append(Relacion(grupos[a].id, grupos[b].id, rel, atr, evidencia_mejor[i], round(float(conf[c]), 4),
+                                               vigencia=vigencia_mejor[i]))
         relaciones, _ = filtrar_relaciones(relaciones, {g.id: g for g in grupos})
         doc = Documento(meta.get("doc_id", "texto"), texto, menciones, grupos, relaciones, meta.get("url", ""), meta.get("fecha", ""),
                         meta.get("seccion", ""), meta.get("titulo", ""), "modelo",
@@ -704,16 +707,18 @@ git commit -m "Mide el pipeline ONNX en CPU a cuatro hilos"
 
 **Interfaces:**
 - `a_followthemoney(doc: Documento, publisher: str = "", extractor: str = "enrel") -> list[dict]`: una entidad FtM por grupo y una por relación, en el formato JSON de FtM (`{"id", "schema", "properties": {...}}`):
-  - Grupos: `persona → Person {name, alias (las demás menciones distintas)}`; `organizacion → Organization {name, alias}`; `lugar → Address {full}`; `cargo → Position {name}`; `norma → Document {title}` (FtM no tiene esquema de norma; se usa `Document` con `title` y `summary = "norma"`); `obra → Document {title}`; `monto → Thing {name}` con `summary = "monto"`. `id` = `sha1(doc_id + "|" + grupo.id + "|" + plegar(canonico))` en hexadecimal.
-  - Relaciones → esquema FtM y propiedades según la tabla de la spec §3.2: `ocupa_cargo → Occupancy {holder, post, status: current|ended|candidate}`; `nombro_a → UnknownLink {subject, object, role: "nombró a"}`; `sucedio_a → Succession {predecessor, successor}`; `miembro_de → Membership {member, organization}`; `trabaja_en → Employment {employee, employer}`; `dirige → Directorship {director, organization}`; `fundo → Directorship {director, organization, role: "fundador"}`; `propietario_de → Ownership {owner, asset}`; `socio_de → Associate {person, associate}`; `parte_de → Membership {member, organization, role: "parte de"}`; `familiar_de → Family {person, relative, relationship: <parentesco en español>}` (para `hijo_de`, `person` es el hijo y `relationship = "hijo/a"`); `financia_a → Payment {payer, beneficiary}`; `contrato_a → ContractAward` no encaja sin un `Contract`: se emite `UnknownLink {subject, object, role: "contrató a"}`; `investigado_por → UnknownLink {subject, object, role: "investigado por" | "acusado por" | "condenado por"}`; `ubicado_en → UnknownLink {subject, object, role: "ubicado en"}`; `apoya_a → UnknownLink {role: "apoya a"}`; `se_opone_a → UnknownLink {role: "se opone a"}`; `vinculo_sin_tipo → UnknownLink`.
-  - Todas las aristas llevan `sourceUrl = doc.url`, `publisher`, `retrievedAt` (fecha de hoy ISO), `summary` (la evidencia recortada a 300 caracteres), `description = f"confianza {confianza:.2f}; extractor {extractor} {doc.origen.get('modelo', '')}"`, y `date = doc.fecha`.
+  - Grupos: `persona → Person {name, alias (las demás menciones distintas)}`; `organizacion → Organization {name, alias}`; `lugar → Address {full}`; `cargo → Position {name}`; `norma → Document {title}` (FtM no tiene esquema de norma; se usa `Document` con `title` y `summary = "norma"`). `obra` y `monto` no llegan aquí: se retiraron del esquema de tipos (§3.1), así que el modelo no los produce. `id` = `sha1(doc_id + "|" + grupo.id + "|" + plegar(canonico))` en hexadecimal.
+  - Relaciones → esquema FtM y propiedades según la tabla de la spec §3.2: `ocupa_cargo → Occupancy {holder, post, status}` con `status` derivado de la vigencia y del atributo (ver abajo), no solo del atributo; `nombro_a → UnknownLink {subject, object, role: "nombró a"}`; `sucedio_a → Succession {predecessor, successor}`; `miembro_de → Membership {member, organization}`; `trabaja_en → Employment {employee, employer}`; `dirige → Directorship {director, organization}`; `fundo → Directorship {director, organization, role: "fundador"}`; `propietario_de → Ownership {owner, asset}`; `socio_de → Associate {person, associate}`; `parte_de → Membership {member, organization, role: "parte de"}`; `familiar_de → Family {person, relative, relationship: <parentesco en español>}` (para `hijo_de`, `person` es el hijo y `relationship = "hijo/a"`); `financia_a → Payment {payer, beneficiary}`; `contrato_a → ContractAward` no encaja sin un `Contract`: se emite `UnknownLink {subject, object, role: "contrató a"}`; `investigado_por → UnknownLink {subject, object, role: "investigado por" | "acusado por" | "condenado por"}`; `ubicado_en → UnknownLink {subject, object, role: "ubicado en"}`; `apoya_a → UnknownLink {role: "apoya a"}` (destino persona, organizacion, cargo o, desde la corrección del esquema, norma; `UnknownLink` no distingue tipo de nodo, así que no necesita cambio de código); `impulsa_norma → UnknownLink {subject, object, role: "impulsó la norma"}` (relación nueva, separada de apoya_a por el acto legislativo); `se_opone_a → UnknownLink {role: "se opone a"}` (mismo caso, destino puede ser norma); `vinculo_sin_tipo → UnknownLink`.
+  - La vigencia mapea al estado de toda arista, sustituyendo la vieja lógica que derivaba `status` solo del atributo de `ocupa_cargo`: `vigente` → `status: current` y `date = doc.fecha`; `pasada` → `status: ended` y `endDate = doc.fecha` (como cota superior, no como fecha exacta del cese); `futura` → `status: current` con una nota en `summary` («anunciado, aún no vigente en la fecha del artículo»). Solo `Occupancy` tiene `status`; en las demás relaciones la vigencia solo mueve `date`/`endDate` y la nota de `summary`. En `ocupa_cargo`, el atributo (titular/aspirante) se combina con la vigencia: aspirante vigente o futura → `status: candidate`; aspirante pasada → `status: ended` (ya no es candidato); titular sigue la regla general de arriba.
+  - Todas las aristas llevan `sourceUrl = doc.url`, `publisher`, `retrievedAt` (fecha de hoy ISO), `summary` (la evidencia recortada a 300 caracteres, con la nota de «anunciado» antepuesta si la vigencia es futura), `description = f"confianza {confianza:.2f}; extractor {extractor} {doc.origen.get('modelo', '')}"`, y `date` o `endDate` según la vigencia (arriba).
 - `escribir_ftm(entidades: list[dict], ruta: Path)`: JSONL, una entidad por línea (formato que `ftm` y Aleph importan).
 - Si el paquete `followthemoney` está instalado (extra `ftm`), un test opcional valida cada entidad con `model.get_proxy(d)` y `proxy.schema.validate`.
 
 - [ ] **Paso 1: Test**
 
 ```python
-from enrel.esquema.ftm import a_followthemoney
+from enrel.datos.documento import Relacion
+from enrel.esquema.ftm import _arista, a_followthemoney
 from tests.test_datos_documento import doc_ejemplo
 
 
@@ -724,9 +729,36 @@ def test_ftm_basico():
     assert {"Person", "Position", "Organization", "Occupancy", "UnknownLink"} <= esquemas
     occ = next(e for e in ents if e["schema"] == "Occupancy")
     assert occ["properties"]["status"] == ["current"] and occ["properties"]["sourceUrl"] == ["https://x"]
+    assert "endDate" not in occ["properties"]                                                 # vigente por defecto
+    if d.fecha:
+        assert occ["properties"]["date"] == [d.fecha]
     assert all(len(e["id"]) == 40 for e in ents)
     persona = next(e for e in ents if e["schema"] == "Person" and "Gustavo Petro" in e["properties"]["name"])
     assert persona["properties"]["name"] == ["Gustavo Petro"]
+
+
+def test_ftm_vigencia_a_estado_y_fechas():
+    d = doc_ejemplo()
+    d.fecha = "2020-01-01"          # fecha del artículo conocida, sin depender de lo que traiga el fixture
+    ids = {g.id: f"id-{g.id}" for g in d.grupos}
+    fecha = d.fecha
+    # titular + pasada → ended, endDate como cota superior.
+    r_pasada = Relacion("e1", "e2", "ocupa_cargo", "titular", vigencia="pasada")
+    a = _arista(d, r_pasada, ids, "", "enrel")
+    assert a["properties"]["status"] == ["ended"] and a["properties"]["endDate"] == [fecha] and "date" not in a["properties"]
+    # titular + futura → current, con nota de anunciado en el resumen.
+    r_futura = Relacion("e1", "e2", "ocupa_cargo", "titular", vigencia="futura")
+    b = _arista(d, r_futura, ids, "", "enrel")
+    assert b["properties"]["status"] == ["current"] and b["properties"]["date"] == [fecha]
+    assert "anunciado" in b["properties"].get("summary", [""])[0]
+    # aspirante + vigente → candidate; aspirante + pasada → ended (ya no es candidato).
+    c = _arista(d, Relacion("e1", "e2", "ocupa_cargo", "aspirante", vigencia="vigente"), ids, "", "enrel")
+    assert c["properties"]["status"] == ["candidate"]
+    e = _arista(d, Relacion("e1", "e2", "ocupa_cargo", "aspirante", vigencia="pasada"), ids, "", "enrel")
+    assert e["properties"]["status"] == ["ended"]
+    # una relación sin status propio (no Occupancy) igual mueve date/endDate con la vigencia.
+    f = _arista(d, Relacion("e1", "e2", "trabaja_en", vigencia="pasada"), ids, "", "enrel")
+    assert f["properties"]["endDate"] == [fecha] and "date" not in f["properties"] and "status" not in f["properties"]
 ```
 
 - [ ] **Paso 2: Implementar `enrel/esquema/ftm.py`**
@@ -741,10 +773,19 @@ from enrel.datos.documento import Documento, Grupo, Relacion
 from enrel.datos.normalizar import plegar
 
 _ESQUEMA_GRUPO = {"persona": ("Person", "name"), "organizacion": ("Organization", "name"), "lugar": ("Address", "full"),
-                  "cargo": ("Position", "name"), "norma": ("Document", "title"), "obra": ("Document", "title"), "monto": ("Thing", "name")}
-_ESTADO = {"actual": "current", "anterior": "ended", "aspirante": "candidate"}
+                  "cargo": ("Position", "name"), "norma": ("Document", "title")}
 _PARENTESCO = {"conyuge": "cónyuge", "hijo_de": "hijo/a", "hermano": "hermano/a", "otro": "familiar"}
 _ETAPA = {"investigado": "investigado por", "acusado": "acusado por", "condenado": "condenado por"}
+_STATUS_DE_VIGENCIA = {"vigente": "current", "pasada": "ended", "futura": "current"}
+_NOTA_FUTURA = "anunciado, aún no vigente en la fecha del artículo"
+
+
+def _estado_ocupa_cargo(vigencia: str, atributo: str | None) -> str:
+    # El atributo (titular/aspirante) es una modalidad, no un tiempo (spec §3.2); la vigencia manda en la fecha,
+    # y solo aspirante desvía el status hacia "candidate" en vez del genérico current/ended de la vigencia.
+    if atributo == "aspirante":
+        return "ended" if vigencia == "pasada" else "candidate"
+    return _STATUS_DE_VIGENCIA[vigencia]
 
 
 def _id(*partes: str) -> str:
@@ -757,7 +798,7 @@ def _entidad(doc: Documento, g: Grupo) -> dict:
     props = {prop: [g.canonico]}
     if esquema in ("Person", "Organization") and alias:
         props["alias"] = alias
-    if g.tipo in ("norma", "monto"):
+    if g.tipo == "norma":
         props["summary"] = [g.tipo]
     return {"id": _id(doc.doc_id, g.id, plegar(g.canonico)), "schema": esquema, "properties": props}
 
@@ -766,7 +807,7 @@ def _arista(doc: Documento, r: Relacion, ids: dict[str, str], publisher: str, ex
     a, b = ids[r.cabeza], ids[r.cola]
     rel, atr = r.relacion, r.atributo
     if rel == "ocupa_cargo":
-        esquema, props = "Occupancy", {"holder": [a], "post": [b], "status": [_ESTADO[atr]]}
+        esquema, props = "Occupancy", {"holder": [a], "post": [b], "status": [_estado_ocupa_cargo(r.vigencia, atr)]}
     elif rel == "sucedio_a":
         esquema, props = "Succession", {"successor": [a], "predecessor": [b]}
     elif rel == "miembro_de":
@@ -789,17 +830,22 @@ def _arista(doc: Documento, r: Relacion, ids: dict[str, str], publisher: str, ex
         esquema, props = "Payment", {"payer": [a], "beneficiary": [b]}
     else:
         rol = {"nombro_a": "nombró a", "contrato_a": "contrató a", "ubicado_en": "ubicado en", "apoya_a": "apoya a",
-               "se_opone_a": "se opone a", "vinculo_sin_tipo": "vínculo sin tipo"}.get(rel) or _ETAPA.get(atr, rel)
+               "impulsa_norma": "impulsó la norma", "se_opone_a": "se opone a",
+               "vinculo_sin_tipo": "vínculo sin tipo"}.get(rel) or _ETAPA.get(atr, rel)
         esquema, props = "UnknownLink", {"subject": [a], "object": [b], "role": [rol]}
     if doc.url:
         props["sourceUrl"] = [doc.url]
     if publisher:
         props["publisher"] = [publisher]
     if doc.fecha:
-        props["date"] = [doc.fecha]
+        # La vigencia manda en la fecha de la arista: pasada usa endDate como cota superior, no una fecha exacta de cese.
+        props["endDate" if r.vigencia == "pasada" else "date"] = [doc.fecha]
     props["retrievedAt"] = [date.today().isoformat()]
-    if r.evidencia:
-        props["summary"] = [doc.texto[r.evidencia[0]:r.evidencia[1]][:300]]
+    resumen = doc.texto[r.evidencia[0]:r.evidencia[1]][:300] if r.evidencia else ""
+    if r.vigencia == "futura":
+        resumen = f"{resumen} ({_NOTA_FUTURA})".strip()
+    if resumen:
+        props["summary"] = [resumen]
     props["description"] = [f"confianza {r.confianza if r.confianza is not None else 1.0:.2f}; extractor {extractor} {doc.origen.get('modelo', '')}".strip()]
     return {"id": _id(doc.doc_id, a, b, rel, atr or ""), "schema": esquema, "properties": props}
 
@@ -825,7 +871,7 @@ Completar `enrel extraer --formato ftm` para que escriba JSONL de FtM. Test opci
 ```bash
 uv run pytest tests/test_ftm.py -q
 git add enrel/esquema/ftm.py enrel/inferencia/cli_extraer.py tests/test_ftm.py pyproject.toml
-git commit -m "Añade el exportador a FollowTheMoney con procedencia por arista"
+git commit -m "Añade el exportador a FollowTheMoney, con la vigencia mapeada al estado y las fechas de la arista"
 ```
 
 ---
@@ -919,7 +965,7 @@ git commit -m "Añade la revisión manual de falsos positivos y su resultado"
 - Modificar: `README.md`, `pyproject.toml` (versión `0.1.0`), `enrel/__init__.py`
 
 **Interfaces:**
-- `docs/ficha-modelo.md` con estas secciones, en este orden, todas rellenas con cifras de `docs/resultados/`: qué es y para quién; esquema (enlace a `docs/esquema.md`); datos de entrenamiento (fuente, tamaños por conjunto, cómo se anotó la plata, cómo se corrigió el oro, quién lo corrigió, qué no se publica); resultados sobre la prueba con la tabla de tres filas (línea base, techo del maestro, modelo) con intervalos, RE y RE+, por relación con n ≥ 10, la prueba dirigida aparte, la precisión corregida por la revisión de falsos positivos; rendimiento en CPU con la CPU real usada y el aviso sobre el i5; límites conocidos (relaciones entre párrafos, relaciones colapsadas a vinculo_sin_tipo, sesgo hacia prensa política colombiana, tope de 60 grupos, ventanas); uso previsto y no previsto; licencia y cita; cómo reproducir (comandos por etapa).
+- `docs/ficha-modelo.md` con estas secciones, en este orden, todas rellenas con cifras de `docs/resultados/`: qué es y para quién; esquema (enlace a `docs/esquema.md`); datos de entrenamiento (fuente, tamaños por conjunto, cómo se anotó la plata, cómo se corrigió el oro, quién lo corrigió, qué no se publica); resultados sobre la prueba con la tabla de tres filas (línea base, techo del maestro, modelo) con intervalos, RE y RE+, por relación con n ≥ 10, la fila «vigencia (tasa = R)» junto a la línea base léxica de referencia, la prueba dirigida aparte, la precisión corregida por la revisión de falsos positivos; rendimiento en CPU con la CPU real usada y el aviso sobre el i5; límites conocidos (relaciones entre párrafos, relaciones colapsadas a vinculo_sin_tipo, sesgo hacia prensa política colombiana, tope de 60 grupos, ventanas); uso previsto y no previsto; licencia y cita; cómo reproducir (comandos por etapa).
 - `scripts/publicar_hf.py --repo <org>/enrel-base-es --pesos corridas/<candidato>/mejor --onnx datos/onnx/v0.1-<decision> --ficha docs/ficha-modelo.md --confirmar`: usa `huggingface_hub.HfApi` para crear el repositorio (privado por defecto; `--publico` lo hace público), subir `backbone/`, `cabezas.safetensors`, `config.json`, la carpeta ONNX bajo `onnx/`, y la ficha como `README.md` con el bloque YAML de metadatos (`language: es`, `license: apache-2.0`, `tags: [ner, relation-extraction, spanish, journalism]`, `base_model: BSC-LT/MrBERT-es`). Sin `--confirmar` solo imprime lo que haría.
 
 - [ ] **Paso 1: Escribir la ficha y el script; actualizar README y versión**
@@ -1001,6 +1047,6 @@ git push origin main --tags
 
 **Cobertura de la spec.** §7 etapa 2 con oro y ancla → 3.1. §4.6 exportación ONNX, int8 con tolerancia y fp16 de respaldo, medición a 4 hilos con metas → 3.2, 3.4, 3.5. §4.5 exportador FollowTheMoney con `sourceUrl`, `proof`/evidencia, `retrievedAt` → 3.6. §8 revisión de 50 falsos positivos → 3.7. §9 entregables (repo, pesos en HF en PyTorch y ONNX, ficha en español, datos no publicados, CLI) → 3.3 (`--onnx` en el CLI), 3.8. §10 etapa 3 (backbone alternativo, cifras con intervalos, rendimiento dentro de meta, repo y pesos públicos) → 3.1, 3.5, 3.8. §11 riesgos: VRAM (3.1 barrido), int8 que degrada (3.4), cruces de párrafos (3.7).
 
-**Tipos y firmas.** `exportar_modelo` produce los tres grafos con los nombres de entrada y salida que `PipelineONNX` (3.3) usa literalmente. `CabezaRelaciones.forward_exportable` devuelve `(logits, atencion)` y así lo consume `_Relaciones`. `mascara_tipos` pasa a `enrel/esquema/mascaras.py` en numpy y `modelo/enrel.py` la envuelve; 2.7 y 2.10 siguen recibiendo tensores. `PipelineONNX.extraer(texto, meta)` tiene la misma firma que `Pipeline.extraer`, y `medir` y `comparar_precisiones` la usan.
+**Tipos y firmas.** `exportar_modelo` produce los tres grafos con los nombres de entrada y salida que `PipelineONNX` (3.3) usa literalmente. `CabezaRelaciones.forward_exportable` devuelve `(logits, atencion, logits_vigencia)` y así lo consume `_Relaciones`. `mascara_tipos` pasa a `enrel/esquema/mascaras.py` en numpy y `modelo/enrel.py` la envuelve; 2.7 y 2.10 siguen recibiendo tensores. `PipelineONNX.extraer(texto, meta)` tiene la misma firma que `Pipeline.extraer`, y `medir` y `comparar_precisiones` la usan.
 
 **Placeholders.** Los `<candidato>`, `<decision>` y `<org>` son valores que se conocen al ejecutar (la corrida elegida, la precisión decidida por la tolerancia, la cuenta de Hugging Face que el usuario confirme); cada uno dice de qué informe o decisión sale.

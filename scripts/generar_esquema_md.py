@@ -23,6 +23,7 @@ EQUIVALENCIAS = {
     "investigado_por": ("CourtCaseParty", "P1399"),
     "ubicado_en": ("—", "P159, P551, P131"),
     "apoya_a": ("—", "—"),
+    "impulsa_norma": ("—", "—"),
     "se_opone_a": ("—", "—"),
 }
 _EJEMPLO_TIPOS = {"persona": ("persona", "cargo"), "organizacion": ("organizacion", "organizacion")}

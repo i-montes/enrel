@@ -8,13 +8,13 @@ from enrel.evaluacion.entidades import evaluar_entidades
 from enrel.evaluacion.relaciones import evaluar_relaciones, tripletas_canonicas
 from enrel.evaluacion.tabla import fila, tabla_markdown
 
-_GLOBALES = ("__micro__", "__micro_sin_reserva__", "__macro__", "__direccion__", "__global__")
+_GLOBALES = ("__micro__", "__micro_sin_reserva__", "__macro__", "__direccion__", "__vigencia__", "__global__")
 
 # Qué columnas tienen una cifra real en cada fila global: «macro» es la media de F1 por
-# clase (n, P y R no son cifras reales de esa fila), y «direccion» es una tasa de aciertos
-# —la R de la spec §8— sin P ni F1 propios. Las demás (micro, micro sin reserva, global)
-# publican las cuatro columnas.
-_COLUMNAS_GLOBALES = {"__macro__": ("f1",), "__direccion__": ("n", "r")}
+# clase (n, P y R no son cifras reales de esa fila), y «direccion» y «vigencia» son tasas de
+# aciertos —la R de la spec §8, y su equivalente para el eje de vigencia— sin P ni F1 propios.
+# Las demás (micro, micro sin reserva, global) publican las cuatro columnas.
+_COLUMNAS_GLOBALES = {"__macro__": ("f1",), "__direccion__": ("n", "r"), "__vigencia__": ("n", "r")}
 
 
 def _tabla(resultados: dict, titulo: str, oro, pred, metrica_global=None, con_intervalos=True) -> str:
@@ -29,7 +29,7 @@ def _tabla(resultados: dict, titulo: str, oro, pred, metrica_global=None, con_in
                 else None
             )
             nombre = g.strip("_").replace("_", " ")
-            if g == "__direccion__":
+            if g in ("__direccion__", "__vigencia__"):
                 nombre += " (tasa = R)"
             columnas = _COLUMNAS_GLOBALES.get(g, ("n", "p", "r", "f1"))
             filas.append(fila(nombre, resultados[g], minimo_n=0, ic=ic, columnas=columnas))
