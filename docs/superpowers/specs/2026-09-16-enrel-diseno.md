@@ -26,7 +26,7 @@ Fuera de alcance de la v0.1: enlazado a Wikidata, correferencia entre artículos
 | MiniMax como anotador y verificador, cinco llamadas por artículo | Un solo prompt con 35 predicados; segundo maestro | Definiciones con ejemplos en el prompt valen +13 F1 (GoLLIE); consultar 5 o 6 relaciones por llamada evita la confusión entre esquemas parecidos (IEPile); la verificación ataca el ruido dominante de los LLM, que es de tipo equivocado. Un segundo maestro se suma solo si el primero no pasa la puerta. |
 | Oro corregido por el usuario, 15 a 25 horas | Periodistas; ningún oro | Es lo disponible. Se concentra donde nada lo sustituye: el conjunto de prueba congelado. |
 | Título antepuesto al cuerpo en todos los documentos | Cuerpo solo | En perfiles y en muchas noticias el sujeto principal aparece nombrado en el título y elidido en el cuerpo. |
-| Vigencia como eje propio de toda relación (vigente, pasada, futura, relativo a la fecha del artículo), no como atributo solo de ocupa_cargo | Dejar la vigencia únicamente en el atributo estado de ocupa_cargo | El 14 % de las relaciones del oro trae vigencia no trivial en relaciones que no son de cargo (409 pasadas y 29 futuras de 1.548, de las que 229 pasadas son de cargo): limitarla a ocupa_cargo perdía la mayor parte de esa información. Decisión del 2026-09-17; las clases finas bajan de 25 a 23. |
+| Vigencia como eje propio de toda relación (vigente, pasada, futura, relativo a la fecha del artículo), ortogonal a la modalidad de ocupa_cargo (titular, aspirante) | Dejar la vigencia únicamente en el atributo estado de ocupa_cargo, con aspirante como si fuera un tiempo más | El 14 % de las relaciones del oro trae vigencia no trivial en relaciones que no son de cargo (409 pasadas y 29 futuras de 1.548, de las que 229 pasadas son de cargo): limitarla a ocupa_cargo perdía la mayor parte de esa información. Aspirar es una modalidad, no un tiempo: tratarlo como vigencia hace que «aspiró a la Presidencia y perdió» se lea como «ocupará el cargo» (candidaturas en el 25 % del archivo, 16.034 de 63.991 artículos). Por eso el eje temporal (vigencia) y el de modalidad (titular/aspirante, atributo propio de ocupa_cargo) quedan separados y ortogonales. Decisión del 2026-09-17; las clases finas quedan en 24. |
 
 ## 3. Esquema
 
@@ -58,7 +58,7 @@ Diecisiete relaciones tipadas más una de reserva. Cada una tiene dominio y rang
 
 | Relación | De → a | Simétrica | Atributo | Absorbe de legajo | FollowTheMoney / Wikidata |
 |---|---|---|---|---|---|
-| ocupa_cargo | persona → cargo | no | — | ocupa el cargo, aspira a, renunció a | Occupancy / P39 |
+| ocupa_cargo | persona → cargo | no | modalidad: titular, aspirante | ocupa el cargo, aspira a, renunció a | Occupancy / P39 |
 | nombro_a | persona, organizacion → persona | no | — | nombró a | — / P748 |
 | sucedio_a | persona → persona | no | — | sucedió a | Succession / P1365 |
 | miembro_de | persona → organizacion | no | — | miembro de; parte de (persona→org) | Membership / P102, P463 |
@@ -77,12 +77,13 @@ Diecisiete relaciones tipadas más una de reserva. Cada una tiene dominio y rang
 | se_opone_a | persona, organizacion → persona, organizacion, norma | no | — | opositor de, criticó a | — |
 | vinculo_sin_tipo | cualquiera ↔ cualquiera | sí | — | se reunió con, demandó a, y lo que no encaja | UnknownLink |
 
-Todas las relaciones llevan además un campo `vigencia`, eje propio y no un atributo más: `vigente`, `pasada` o `futura`, por defecto `vigente`, siempre relativo a la fecha del artículo (la fecha dice cuándo se afirmó algo, no cuándo fue verdad). `futura` cubre tanto lo anunciado («asumirá», «será») como lo aspirado («aspira a la Presidencia»), que es como ya lo trataba el vocabulario de legajo. Por eso ocupa_cargo pierde los atributos de la tabla anterior (actual, anterior, aspirante): eran exactamente este eje, ahora expresado una sola vez para las 17 relaciones en lugar de repetido solo en una. En las relaciones que son sucesos y no estados —`nombro_a`, `sucedio_a`, `fundo`, `contrato_a`, `financia_a`, señaladas por `es_suceso(relacion)`— la vigencia rara vez aplica y normalmente se queda en `vigente`.
+Todas las relaciones llevan además un campo `vigencia`, eje propio y no un atributo más: `vigente`, `pasada` o `futura`, por defecto `vigente`, siempre relativo a la fecha del artículo (la fecha dice cuándo se afirmó algo, no cuándo fue verdad). `futura` cubre lo anunciado («asumirá», «será»). El viejo atributo de ocupa_cargo (actual, anterior, aspirante) mezclaba dos ejes distintos: uno temporal, que ahora es esta vigencia común a las 17 relaciones; y uno de modalidad —ser titular del cargo o solo aspirar a él— que no es un tiempo y por eso sigue siendo el atributo propio de ocupa_cargo (titular, aspirante), ortogonal a la vigencia. Los cuatro cruces tienen sentido y antes no se podían decir todos: titular + vigente lo ejerce hoy; titular + pasada lo ejerció; aspirante + vigente es candidato ahora; aspirante + pasada fue candidato y ya no. En las relaciones que son sucesos y no estados —`nombro_a`, `sucedio_a`, `fundo`, `contrato_a`, `financia_a`, señaladas por `es_suceso(relacion)`— la vigencia rara vez aplica y normalmente se queda en `vigente`.
 
 Reglas de desambiguación que van a la guía y al prompt:
 
 - ocupa_cargo exige un cargo como objeto. Si el texto da el cargo, es ocupa_cargo y no trabaja_en. «Alcaldesa de Bogotá» produce ocupa_cargo (persona→cargo) y dirige (persona→«Alcaldía de Bogotá») solo si la organización está mencionada.
-- vigencia, para toda relación: «pasada» con «ex», «fue», «entonces», «hasta», «exministro»; «futura» con «candidato», «aspira», «precandidato», «asumirá», «será»; «vigente» en los demás casos, incluido el presente sin marca de fin.
+- vigencia, para toda relación: «pasada» con «ex», «fue», «entonces», «hasta», «exministro»; «futura» con «asumirá», «será»; «vigente» en los demás casos, incluido el presente sin marca de fin.
+- atributo de ocupa_cargo (modalidad, no tiempo): «titular» si ejerce, ejerció o ejercerá el cargo; «aspirante» con «candidato», «aspira», «precandidato», se postula o se postuló. Es ortogonal a la vigencia: un aspirante puede estarlo vigente o pasada, igual que un titular.
 - miembro_de es pertenencia sin empleo: militancia en un partido o movimiento, membresía de una junta, comisión o colectivo. Un adjetivo de afiliación («el liberal X») no basta; hace falta que el texto afirme la pertenencia.
 - trabaja_en es empleo o asesoría en una organización que no es partido, sin cargo nombrado. Si hay cargo, ocupa_cargo. Si dirige, dirige.
 - parte_de solo entre organizaciones («la Facultad es parte de la Universidad», «filial de»). Una persona nunca es parte_de.
@@ -93,7 +94,7 @@ Reglas de desambiguación que van a la guía y al prompt:
 - Las simétricas se anotan una sola vez; el exportador las duplica si el entrenamiento lo requiere.
 - hijo_de se anota con la cabeza en el hijo; padre o madre se deriva. Nunca se anotan las dos direcciones.
 
-Clases finas del clasificador: las 17 relaciones se despliegan en 22 clases finas (familiar_de ×4 parentescos, investigado_por ×3 etapas, las otras 15 —incluida ocupa_cargo, que ya no lleva atributo— tal cual) más vinculo_sin_tipo, 23 en total. La vigencia (vigente, pasada, futura) es un eje aparte, común a las 23, que no las multiplica por tres. Se evalúa a los dos niveles.
+Clases finas del clasificador: las 17 relaciones se despliegan en 23 clases finas (ocupa_cargo ×2 modalidades, familiar_de ×4 parentescos, investigado_por ×3 etapas, las otras 14 tal cual) más vinculo_sin_tipo, 24 en total. La vigencia (vigente, pasada, futura) es un eje aparte, ortogonal y común a las 24 —incluidas las dos de ocupa_cargo—, que no las multiplica por tres. Se evalúa a los dos niveles.
 
 Puertas por relación: una relación se publica en el modelo cuando cumple dos condiciones, medidas al final de la etapa 2: al menos 60 ejemplos positivos en entrenamiento tras filtros, y acuerdo entre el oro humano y el maestro ≥ 0,70 F1 en la prueba. La que no cumpla se entrena igual pero en inferencia se colapsa a vinculo_sin_tipo, y se documenta. apoya_a y se_opone_a son las candidatas a caer.
 
@@ -140,7 +141,7 @@ Para cada par ordenado de grupos (cabeza, cola) de tipos admitidos por al menos 
 
 - Representación de cada grupo: logsumexp sobre las representaciones de sus menciones (estado de la primera subpalabra de cada mención).
 - Contexto local del par: agregación de los estados del documento ponderada por la atención que las menciones de cabeza y cola prestan a cada posición, tomada de la última capa del codificador (la técnica de ATLOP, sin parámetros extra).
-- Clasificador: proyecciones de cabeza y cola concatenadas con el contexto, bilineal agrupado (grupos de 64), salida de 23 logits (22 clases finas más vinculo_sin_tipo) más un logit de umbral aprendido.
+- Clasificador: proyecciones de cabeza y cola concatenadas con el contexto, bilineal agrupado (grupos de 64), salida de 24 logits (23 clases finas más vinculo_sin_tipo) más un logit de umbral aprendido.
 - Cabeza de vigencia: una cabeza pequeña aparte sobre la misma representación del par (proyecciones de cabeza y cola más contexto), con 3 salidas (vigente, pasada, futura); no se multiplican las clases finas por tres, que reventaría la cola larga. Pérdida propia de entropía cruzada, sumada a la de relaciones con un peso configurable. Decodificación por argmax de esas 3 salidas. Línea base a batir: una regla léxica sobre la oración de evidencia («ex», «fue», «entonces», «exministro», «asumirá», «será»), la misma que ya usa legajo para proponerla.
 - Máscara de tipos: los logits de las relaciones que no admiten el par de tipos se fijan a −∞ antes de la pérdida y de la decodificación.
 - Pérdida: umbral adaptativo (una clase TH por par; las positivas deben superar a TH y TH debe superar a las negativas) con reponderación focal adaptativa para la cola larga (KD-DocRE). Sin umbral global que calibrar.
@@ -213,7 +214,7 @@ Modelo: el MiniMax disponible por API compatible con OpenAI, sin razonamiento, t
 
 **Llamadas 2 a 4, relaciones por familia.** Entrada: el texto, la lista de entidades de la llamada 1 con sus identificadores, y la familia:
 
-- Familia A, cargos y trabajo: ocupa_cargo, nombro_a, sucedio_a, trabaja_en, dirige, miembro_de.
+- Familia A, cargos y trabajo: ocupa_cargo (con modalidad), nombro_a, sucedio_a, trabaja_en, dirige, miembro_de.
 - Familia B, empresa y dinero: fundo, propietario_de, socio_de, parte_de, contrato_a, financia_a.
 - Familia C, familia, política, justicia y lugar: familiar_de (con parentesco), apoya_a, se_opone_a, investigado_por (con etapa), ubicado_en.
 
@@ -258,13 +259,13 @@ Opcionales, para un experimento de precalentamiento de la cabeza de relaciones, 
 
 Herramienta principal: la capa de revisión de legajo (paso 6), que el usuario ya domina. Las propuestas las pone el modelo afinado anterior de legajo, que saca bien las entidades; el usuario corrige tramos y tipos, resuelve identidades con `=` y arregla las relaciones, que es lo que estaba mal. El oro queda en las tablas `anotaciones`, `relaciones`, `resoluciones` y `tiempos` de `legajo.sqlite`, con el vocabulario de 35 predicados y el campo `cuando`.
 
-Exportador `enrel/anotacion/desde_legajo.py`: lee un lote de `legajo.sqlite` (ruta configurable, porque el usuario anota en el Mac o en el PC) o los JSON por artículo del formato de `oro_apartado.py`, aplica el mapeo de 3.3, convierte `cuando` en `vigencia` para todas las relaciones (vigente → vigente, pasada → pasada, «aspira a» → futura) y mapea los tres predicados de cargo de legajo (`ocupa el cargo`, `ocupó el cargo`, `aspira al cargo`) a ocupa_cargo con la vigencia correspondiente —el mapeo también acepta los predicados viejos—, toma los grupos de `resoluciones` («misma») y de las menciones repetidas, recompone el documento entero a partir de los párrafos con offsets globales, valida y escribe el formato interno. Prueba de ida y vuelta sobre los 125 artículos de oro existentes.
+Exportador `enrel/anotacion/desde_legajo.py`: lee un lote de `legajo.sqlite` (ruta configurable, porque el usuario anota en el Mac o en el PC) o los JSON por artículo del formato de `oro_apartado.py`, aplica el mapeo de 3.3, convierte `cuando` en `vigencia` para todas las relaciones (vigente → vigente, pasada → pasada, futura → futura) y mapea los predicados de cargo de legajo a ocupa_cargo con su atributo y su vigencia: «ocupa el cargo» → titular con la vigencia de `cuando` (si `cuando` es futura, es un nombramiento anunciado, «será ministro», no una candidatura); «ocupó el cargo» y «renunció a» → titular con vigencia pasada; «aspira al cargo» y «aspira a» → aspirante con la vigencia de `cuando` —el mapeo también acepta los predicados viejos—, toma los grupos de `resoluciones` («misma») y de las menciones repetidas, recompone el documento entero a partir de los párrafos con offsets globales, valida y escribe el formato interno. Prueba de ida y vuelta sobre los 125 artículos de oro existentes.
 
 Límite conocido de esta vía: la revisión de legajo trabaja por párrafo, así que las relaciones cuyos extremos están en párrafos distintos no se pueden marcar. En la evaluación, una relación correcta del modelo que cruce párrafos aparecerá como falso positivo; la revisión manual de 50 falsos positivos de 8 la cuantifica y se reporta. Label Studio queda como herramienta opcional para una pasada posterior a nivel de documento, si esa cifra resulta alta.
 
 Convenciones que el usuario sigue al anotar en legajo para que el mapeo sea sin pérdidas (van también en la guía):
 
-1. Persona y cargo siempre separados, unidos por «ocupa el cargo», «ocupó el cargo» o «aspira al cargo» según corresponda; `cuando` correcto, porque se convierte en la vigencia de la relación.
+1. Persona y cargo siempre separados, unidos por «ocupa el cargo», «ocupó el cargo» o «aspira al cargo» según corresponda (el predicado fija el atributo titular/aspirante); `cuando` correcto, porque se convierte en la vigencia de la relación.
 2. Parentescos con el predicado fino («hijo de» con la cabeza en el hijo, «hermano de», «cónyuge o pareja de»); «familiar de» solo para tíos, primos, sobrinos, cuñados, suegros y similares. «Padre o madre de» se puede usar, el mapeo lo invierte.
 3. «Parte de» solo organización → organización; pertenencia de persona a partido, junta o colectivo con «miembro de»; empleo sin cargo nombrado con «trabaja en»; «asesor de» solo persona → organización.
 4. «Dueño de» y «socio de» persona → organización van a propietario_de; «socio de» persona ↔ persona se conserva como socio_de.
