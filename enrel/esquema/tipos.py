@@ -25,7 +25,7 @@ def _r(nombre, desde, hasta, simetrica=False, atributos=(), familia=""):
 
 
 _LISTA = [
-    _r("ocupa_cargo", [P], [C], familia="A"),
+    _r("ocupa_cargo", [P], [C], atributos=("titular", "aspirante"), familia="A"),
     _r("nombro_a", [P, O], [P], familia="A"),
     _r("sucedio_a", [P], [P], familia="A"),
     _r("trabaja_en", [P], [O], familia="A"),
@@ -38,8 +38,8 @@ _LISTA = [
     _r("contrato_a", [O, P], [O, P], familia="B"),
     _r("financia_a", [P, O], [P, O], familia="B"),
     _r("familiar_de", [P], [P], simetrica=True, atributos=("conyuge", "hijo_de", "hermano", "otro"), familia="C"),
-    _r("apoya_a", [P, O], [P, O, C], familia="C"),
-    _r("se_opone_a", [P, O], [P, O], familia="C"),
+    _r("apoya_a", [P, O], [P, O, C, N], familia="C"),
+    _r("se_opone_a", [P, O], [P, O, N], familia="C"),
     _r("investigado_por", [P, O], [O], atributos=("investigado", "acusado", "condenado"), familia="C"),
     _r("ubicado_en", [P, O, L], [L], familia="C"),
 ]
@@ -86,7 +86,7 @@ def desglosar(clase: str) -> tuple[str, str | None]:
 CLASES_FINAS: tuple[str, ...] = tuple(clase_fina(d.nombre, a) for d in _LISTA for a in (d.atributos or (None,))) + (
     SIN_TIPO,
 )
-assert len(CLASES_FINAS) == 23
+assert len(CLASES_FINAS) == 24
 INDICE_CLASE: dict[str, int] = {c: i for i, c in enumerate(CLASES_FINAS)}
 
 

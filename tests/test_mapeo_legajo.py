@@ -15,18 +15,23 @@ def test_mapear_tipo():
 @pytest.mark.parametrize(
     "pred,ta,tb,cuando,esperado",
     [
-        # ocupa_cargo ya no tiene atributo: la distinción actual/anterior/aspirante vive en `vigencia`.
-        ("ocupa el cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", None, False, "vigente")),
-        ("ocupa el cargo", "persona", "cargo", "pasada", Mapeo("ocupa_cargo", None, False, "pasada")),
-        ("ocupa el cargo", "persona", "cargo", "futura", Mapeo("ocupa_cargo", None, False, "futura")),
-        # «aspira a» y «renunció a» ya llevan el tiempo en el nombre: su vigencia es fija y
-        # gana sobre `cuando`, aunque llegue otra cosa.
-        ("aspira a", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", None, False, "futura")),
-        ("aspira a", "persona", "cargo", "pasada", Mapeo("ocupa_cargo", None, False, "futura")),
-        ("renunció a", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", None, False, "pasada")),
-        ("renunció a", "persona", "cargo", "futura", Mapeo("ocupa_cargo", None, False, "pasada")),
+        # ocupa_cargo tiene un atributo de modalidad (titular/aspirante), ortogonal a la vigencia:
+        # «ocupa el cargo» siempre es `titular`, con la vigencia de `cuando` tal cual (incluida
+        # `futura`, que aquí es un nombramiento anunciado, no una candidatura).
+        ("ocupa el cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "titular", False, "vigente")),
+        ("ocupa el cargo", "persona", "cargo", "pasada", Mapeo("ocupa_cargo", "titular", False, "pasada")),
+        ("ocupa el cargo", "persona", "cargo", "futura", Mapeo("ocupa_cargo", "titular", False, "futura")),
+        # «ocupó el cargo» y «renunció a» ya llevan el tiempo en el nombre: su vigencia es fija,
+        # siempre `titular` + `pasada`, y gana sobre `cuando`, aunque llegue otra cosa.
+        ("renunció a", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "titular", False, "pasada")),
+        ("renunció a", "persona", "cargo", "futura", Mapeo("ocupa_cargo", "titular", False, "pasada")),
         # incluso mapeando a SIN_TIPO (aquí, sin cargo como objeto) la vigencia forzada se aplica.
         ("renunció a", "persona", "organizacion", "vigente", Mapeo(SIN_TIPO, None, False, "pasada")),
+        # «aspira a» y «aspira al cargo» son la modalidad `aspirante`, no un tiempo: la vigencia
+        # es la de `cuando` tal cual, incluida una candidatura pasada (perdió, ya no es candidato).
+        ("aspira a", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "aspirante", False, "vigente")),
+        ("aspira a", "persona", "cargo", "pasada", Mapeo("ocupa_cargo", "aspirante", False, "pasada")),
+        ("aspira a", "persona", "cargo", "futura", Mapeo("ocupa_cargo", "aspirante", False, "futura")),
         ("padre o madre de", "persona", "persona", "vigente", Mapeo("familiar_de", "hijo_de", True, "vigente")),
         ("hijo de", "persona", "persona", "vigente", Mapeo("familiar_de", "hijo_de", False, "vigente")),
         ("cónyuge o pareja de", "persona", "persona", "vigente", Mapeo("familiar_de", "conyuge", False, "vigente")),
@@ -37,7 +42,9 @@ def test_mapear_tipo():
         ("socio de", "persona", "organizacion", "vigente", Mapeo("propietario_de", None, False, "vigente")),
         ("socio de", "persona", "persona", "vigente", Mapeo("socio_de", None, False, "vigente")),
         ("aliado de", "organizacion", "organizacion", "vigente", Mapeo("apoya_a", None, False, "vigente")),
-        ("criticó a", "persona", "norma", "vigente", Mapeo(SIN_TIPO, None, False)),
+        # apoya_a y se_opone_a admiten norma en la cola (radicar/apoyar o criticar/hundir una ley).
+        ("criticó a", "persona", "norma", "vigente", Mapeo("se_opone_a", None, False, "vigente")),
+        ("apoyó a", "persona", "norma", "vigente", Mapeo("apoya_a", None, False, "vigente")),
         ("acusado de", "persona", "norma", "vigente", Mapeo(SIN_TIPO, None, False)),
         (
             "condenado por",
@@ -49,8 +56,8 @@ def test_mapear_tipo():
         ("ubicado en", "monto", "lugar", "vigente", Mapeo(SIN_TIPO, None, False)),
         ("citado en", "persona", "organizacion", "vigente", Mapeo(SIN_TIPO, None, False)),
         # vocabulario nuevo de legajo
-        ("ocupó el cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", None, False, "pasada")),
-        ("aspira al cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", None, False, "futura")),
+        ("ocupó el cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "titular", False, "pasada")),
+        ("aspira al cargo", "persona", "cargo", "vigente", Mapeo("ocupa_cargo", "aspirante", False, "vigente")),
         ("cónyuge de", "persona", "persona", "vigente", Mapeo("familiar_de", "conyuge", False, "vigente")),
         ("propietario de", "organizacion", "organizacion", "vigente", Mapeo("propietario_de", None, False, "vigente")),
         (

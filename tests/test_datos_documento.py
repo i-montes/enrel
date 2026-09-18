@@ -22,7 +22,7 @@ def doc_ejemplo() -> Documento:
     ]
     r = [
         Relacion("e1", "e2", "nombro_a"),
-        Relacion("e2", "e3", "ocupa_cargo", vigencia="pasada", evidencia=(15, 96)),
+        Relacion("e2", "e3", "ocupa_cargo", "titular", vigencia="pasada", evidencia=(15, 96)),
     ]
     return Documento(
         "wp:1",
@@ -49,7 +49,7 @@ def test_documento_valido_y_offsets():
         assert d.texto[m.ini : m.fin] == m.texto
     assert validar_documento(d) == []
     assert [m.id for m in d.menciones_de("e1")] == ["m1", "m2"]
-    assert d.clase_fina_de(d.relaciones[1]) == "ocupa_cargo"  # ocupa_cargo ya no tiene atributos
+    assert d.clase_fina_de(d.relaciones[1]) == "ocupa_cargo:titular"
     assert d.relaciones[0].vigencia == "vigente"  # por defecto
     assert d.relaciones[1].vigencia == "pasada"
 
@@ -79,7 +79,7 @@ def test_validar_detecta_errores():
     d = doc_ejemplo()
     d.menciones[0].fin = 12
     d.relaciones.append(Relacion("e1", "e1", "socio_de"))
-    d.relaciones.append(Relacion("e1", "e4", "ocupa_cargo"))
+    d.relaciones.append(Relacion("e1", "e4", "ocupa_cargo", "titular"))
     d.relaciones.append(Relacion("e1", "e2", "nombro_a"))
     errores = validar_documento(d)
     assert any("m1" in e and "texto" in e for e in errores)

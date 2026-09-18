@@ -32,7 +32,7 @@ def test_informe_macro_y_direccion_en_blanco_y_micro_doble():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular"),
             Relacion("p1", "p2", "socio_de"),
         ]
     )
@@ -59,7 +59,7 @@ def test_intervalo_cubre_el_valor():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular"),
             Relacion("p1", "p2", "socio_de"),
         ]
     )

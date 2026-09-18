@@ -23,7 +23,7 @@ ORO = doc(
     ],
     [
         Relacion("g1", "g2", "nombro_a"),
-        Relacion("g2", "g3", "ocupa_cargo", vigencia="vigente"),
+        Relacion("g2", "g3", "ocupa_cargo", "titular", vigencia="vigente"),
         Relacion("g1", "g2", "socio_de"),
     ],
 )
@@ -43,17 +43,18 @@ def test_acierto_direccion_y_simetrica():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo", vigencia="pasada"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular", vigencia="pasada"),
             Relacion("p2", "p1", "socio_de"),
         ]
     )
     r = evaluar_relaciones([ORO], [p], "gruesa")
     assert (r["__micro__"].tp, r["__micro__"].fp, r["__micro__"].fn) == (3, 0, 0)
     fina = evaluar_relaciones([ORO], [p], "fina")
-    # ocupa_cargo ya no tiene atributo: una vigencia distinta (aquí, «pasada» contra «vigente»
-    # en el oro) no crea clases finas cruzadas ni cuenta como error de RE+ fina.
-    assert fina["ocupa_cargo"].tp == 1
-    assert "ocupa_cargo:actual" not in fina and "ocupa_cargo:anterior" not in fina
+    # el atributo de ocupa_cargo (titular/aspirante) coincide en ambos lados; una vigencia
+    # distinta (aquí, «pasada» contra «vigente» en el oro) no crea clases finas cruzadas ni
+    # cuenta como error de RE+ fina: eso vive aparte, en __vigencia__.
+    assert fina["ocupa_cargo:titular"].tp == 1
+    assert "ocupa_cargo:aspirante" not in fina
     assert fina["__micro__"].tp == 3
 
 
@@ -65,7 +66,7 @@ def test_vigencia_es_eje_aparte_de_re():
     p = pred(
         [
             Relacion("p1", "p2", "nombro_a"),
-            Relacion("p2", "p3", "ocupa_cargo", vigencia="pasada"),
+            Relacion("p2", "p3", "ocupa_cargo", "titular", vigencia="pasada"),
             Relacion("p2", "p1", "socio_de"),
         ]
     )
@@ -125,7 +126,7 @@ def test_macro_excluye_sin_tipo_pero_micro_lo_incluye():
 
 def test_ign():
     ignorar = tripletas_canonicas([ORO], "gruesa") - {("gustavo petro", "nombro_a", "luis carlos reyes")}
-    p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo")])
+    p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p2", "p3", "ocupa_cargo", "titular")])
     r = evaluar_relaciones([ORO], [p], "gruesa", ignorar=ignorar)
     assert (r["__micro__"].tp, r["__micro__"].fp, r["__micro__"].fn) == (1, 0, 0)
 

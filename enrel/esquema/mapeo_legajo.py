@@ -27,21 +27,22 @@ _NADA = Mapeo(SIN_TIPO, None, False)
 
 # Predicados que ya llevan el tiempo en el nombre: su vigencia es fija y gana sobre `cuando`,
 # que en legajo trae la columna del mismo nombre pero aquí sería redundante o contradictorio.
+# «aspira al cargo» y «aspira a» no están aquí: aspirar es una modalidad (atributo `aspirante`),
+# no un tiempo, así que su vigencia es la que traiga `cuando`, tal cual.
 _VIGENCIA_FORZADA = {
     "ocupó el cargo": "pasada",
     "renunció a": "pasada",
-    "aspira al cargo": "futura",
-    "aspira a": "futura",
 }
 
 # Cada regla es (relacion, atributo, invertir) o una función (tipo_a, tipo_b, cuando) → esa tupla.
-# El atributo de ocupa_cargo desapareció: la distinción actual/anterior/aspirante vive ahora en
-# la vigencia (ver `_VIGENCIA_FORZADA` y la regla general en `mapear_predicado`).
+# El atributo de ocupa_cargo distingue una modalidad ortogonal a la vigencia: `titular` (ejerce,
+# ejerció o ejercerá el cargo) frente a `aspirante` (se postula o se postuló). La vigencia sigue
+# siendo independiente en ambos casos (ver `_VIGENCIA_FORZADA` y la regla general en `mapear_predicado`).
 _REGLAS = {
     # viejos
-    "ocupa el cargo": ("ocupa_cargo", None, False),
-    "aspira a": ("ocupa_cargo", None, False),
-    "renunció a": (lambda ta, tb, c: ("ocupa_cargo", None, False) if tb == "cargo" else (SIN_TIPO, None, False)),
+    "ocupa el cargo": ("ocupa_cargo", "titular", False),
+    "aspira a": ("ocupa_cargo", "aspirante", False),
+    "renunció a": (lambda ta, tb, c: ("ocupa_cargo", "titular", False) if tb == "cargo" else (SIN_TIPO, None, False)),
     "nombró a": ("nombro_a", None, False),
     "sucedió a": ("sucedio_a", None, False),
     "trabaja en": ("trabaja_en", None, False),
@@ -71,6 +72,8 @@ _REGLAS = {
     "financia a": ("financia_a", None, False),
     "donó a": ("financia_a", None, False),
     "contrató a": ("contrato_a", None, False),
+    # apoya_a y se_opone_a admiten norma en la cola (autoría/apoyo u oposición a una ley); la
+    # comprobación genérica de `admite` en `mapear_predicado` descarta lo que no encaje.
     "aliado de": ("apoya_a", None, False),
     "apoyó a": ("apoya_a", None, False),
     "opositor de": ("se_opone_a", None, False),
@@ -91,8 +94,8 @@ _REGLAS = {
     "sanciona con": (SIN_TIPO, None, False),
     "demandó a": (SIN_TIPO, None, False),
     # nuevos (los homónimos ya están arriba)
-    "ocupó el cargo": ("ocupa_cargo", None, False),
-    "aspira al cargo": ("ocupa_cargo", None, False),
+    "ocupó el cargo": ("ocupa_cargo", "titular", False),
+    "aspira al cargo": ("ocupa_cargo", "aspirante", False),
     "propietario de": ("propietario_de", None, False),
     "apoya a": ("apoya_a", None, False),
     "se opone a": ("se_opone_a", None, False),
