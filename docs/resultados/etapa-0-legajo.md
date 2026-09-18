@@ -19,12 +19,24 @@ ortogonal a la vigencia) y de rangos (apoya_a y se_opone_a admiten norma): el or
 esta versión se reexportaron con ese esquema, así que la fila de vigencia ya no sale en 1,00 por
 defecto.
 
-# Evaluación de MiniMax v5 sin pistas (techo del maestro de legajo), esquema con vigencia
+**Nota (2026-09-17, salida de monto y obra):** `monto` y `obra` salieron de `TIPOS` (ver
+`enrel/esquema/tipos.py`; motivo y cifras completas en `etapa-0-cierre.md`). El oro y la plata se
+reexportaron otra vez con el exportador que descarta esos dos grupos y las relaciones que los
+tocan. La tabla de abajo, por eso, ya no tiene filas `monto` ni `obra` y el `n` global de
+entidades bajó de 2290 a 2183: el denominador de entidades cambió de 7 tipos a 5, así que el F1
+estricto y parcial que suben (0,75→0,76 estricto; 0,78→0,79 parcial) **no son una mejora del
+maestro** — es la misma predicción de siempre, sin las dos categorías que peor promediaban
+(`obra` con F1 0,39 estricto era la más floja de la tabla vieja). Las filas de relaciones bajan
+de 530 a 523 en RE/RE+ micro porque siete de las relaciones `vinculo_sin_tipo` de este conjunto
+de prueba tocaban una entidad `obra` u `monto`; ninguna otra relación cambia de valor, porque
+ninguna otra tocaba esos dos tipos.
+
+# Evaluación de MiniMax v5 sin pistas (techo del maestro de legajo), esquema sin monto/obra
 
 Fecha: 2026-09-17 · documentos: 50
 
-- `oro`: `73c6efeacbd2d1446413d53ef02e20d28aad94e85e97462e1fdc1bff50fca147`
-- `pred`: `2c39e8f6294c7793a5394da051ee406d8ac0506ecccec2d0003186f0cf5a02f8`
+- `oro`: `2d54c8da3e05788bb6607a7006cfb53b4354615e08a62d1d1f48553ec10f7bbf`
+- `pred`: `69fb0754babd4ba72098406a517e0c9aa152ce34c40f88ed51f79578f25eda1c`
 
 ### Entidades, estricto
 
@@ -32,12 +44,10 @@ Fecha: 2026-09-17 · documentos: 50
 |---|---:|---:|---:|---:|---|
 | cargo | 376 | 0.73 | 0.59 | 0.65 |  |
 | lugar | 252 | 0.73 | 0.73 | 0.73 |  |
-| monto | 78 | 0.66 | 0.53 | 0.59 |  |
 | norma | 66 | 0.64 | 0.35 | 0.45 |  |
-| obra | 29 | 0.29 | 0.62 | 0.39 |  |
 | organizacion | 746 | 0.78 | 0.75 | 0.76 |  |
 | persona | 743 | 0.87 | 0.81 | 0.84 |  |
-| global | 2290 | 0.78 | 0.72 | 0.75 | [0.71, 0.78] |
+| global | 2183 | 0.79 | 0.73 | 0.76 | [0.73, 0.79] |
 
 ### Entidades, parcial
 
@@ -45,12 +55,10 @@ Fecha: 2026-09-17 · documentos: 50
 |---|---:|---:|---:|---:|---|
 | cargo | 376 | 0.82 | 0.67 | 0.74 |  |
 | lugar | 252 | 0.75 | 0.75 | 0.75 |  |
-| monto | 78 | 0.77 | 0.62 | 0.69 |  |
 | norma | 66 | 0.72 | 0.39 | 0.51 |  |
-| obra | 29 | 0.33 | 0.72 | 0.46 |  |
 | organizacion | 746 | 0.81 | 0.79 | 0.80 |  |
 | persona | 743 | 0.88 | 0.82 | 0.85 |  |
-| global | 2290 | 0.81 | 0.76 | 0.78 | [0.75, 0.82] |
+| global | 2183 | 0.83 | 0.76 | 0.79 | [0.76, 0.82] |
 
 ### Relaciones gruesas, RE
 
@@ -63,7 +71,7 @@ Fecha: 2026-09-17 · documentos: 50
 | financia_a | 1 | insuficiente | insuficiente | insuficiente |  |
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
-| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
+| miembro_de | 56 | 0.48 | 0.50 | 0.49 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
 | ocupa_cargo | 245 | 0.75 | 0.60 | 0.67 |  |
 | parte_de | 11 | 0.13 | 0.36 | 0.19 |  |
@@ -73,12 +81,12 @@ Fecha: 2026-09-17 · documentos: 50
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
-| vinculo_sin_tipo | 26 | 0.20 | 0.38 | 0.27 |  |
-| micro | 530 | 0.52 | 0.49 | 0.51 | [0.45, 0.55] |
+| vinculo_sin_tipo | 19 | 0.23 | 0.37 | 0.29 |  |
+| micro | 523 | 0.54 | 0.50 | 0.52 | [0.46, 0.56] |
 | micro sin reserva | 504 | 0.56 | 0.50 | 0.53 |  |
 | macro |  |  |  | 0.45 |  |
-| direccion (tasa = R) | 249 |  | 0.98 |  |  |
-| vigencia (tasa = R) | 262 |  | 0.93 |  |  |
+| direccion (tasa = R) | 250 |  | 0.98 |  |  |
+| vigencia (tasa = R) | 260 |  | 0.93 |  |  |
 
 ### Relaciones gruesas, RE+
 
@@ -91,7 +99,7 @@ Fecha: 2026-09-17 · documentos: 50
 | financia_a | 1 | insuficiente | insuficiente | insuficiente |  |
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por | 18 | 0.50 | 0.11 | 0.18 |  |
-| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
+| miembro_de | 56 | 0.48 | 0.50 | 0.49 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
 | ocupa_cargo | 245 | 0.75 | 0.60 | 0.67 |  |
 | parte_de | 11 | 0.13 | 0.36 | 0.19 |  |
@@ -101,11 +109,11 @@ Fecha: 2026-09-17 · documentos: 50
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
-| vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 530 | 0.51 | 0.49 | 0.50 | [0.45, 0.55] |
-| micro sin reserva | 504 | 0.55 | 0.50 | 0.52 |  |
+| vinculo_sin_tipo | 19 | 0.23 | 0.37 | 0.29 |  |
+| micro | 523 | 0.54 | 0.50 | 0.51 | [0.46, 0.56] |
+| micro sin reserva | 504 | 0.56 | 0.50 | 0.53 |  |
 | macro |  |  |  | 0.45 |  |
-| direccion (tasa = R) | 248 |  | 0.98 |  |  |
+| direccion (tasa = R) | 249 |  | 0.98 |  |  |
 | vigencia (tasa = R) | 259 |  | 0.93 |  |  |
 
 ### Relaciones finas, RE+
@@ -123,7 +131,7 @@ Fecha: 2026-09-17 · documentos: 50
 | fundo | 2 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por:condenado | 0 | insuficiente | insuficiente | insuficiente |  |
 | investigado_por:investigado | 18 | 1.00 | 0.11 | 0.20 |  |
-| miembro_de | 56 | 0.47 | 0.48 | 0.47 |  |
+| miembro_de | 56 | 0.48 | 0.50 | 0.49 |  |
 | nombro_a | 7 | insuficiente | insuficiente | insuficiente |  |
 | ocupa_cargo:aspirante | 11 | 0.50 | 0.64 | 0.56 |  |
 | ocupa_cargo:titular | 234 | 0.77 | 0.60 | 0.67 |  |
@@ -134,9 +142,9 @@ Fecha: 2026-09-17 · documentos: 50
 | sucedio_a | 6 | insuficiente | insuficiente | insuficiente |  |
 | trabaja_en | 18 | 0.27 | 0.44 | 0.33 |  |
 | ubicado_en | 8 | insuficiente | insuficiente | insuficiente |  |
-| vinculo_sin_tipo | 26 | 0.16 | 0.31 | 0.21 |  |
-| micro | 530 | 0.51 | 0.49 | 0.50 |  |
-| micro sin reserva | 504 | 0.55 | 0.50 | 0.52 |  |
-| macro |  |  |  | 0.46 |  |
-| direccion (tasa = R) | 248 |  | 0.98 |  |  |
+| vinculo_sin_tipo | 19 | 0.23 | 0.37 | 0.29 |  |
+| micro | 523 | 0.54 | 0.50 | 0.51 |  |
+| micro sin reserva | 504 | 0.56 | 0.50 | 0.53 |  |
+| macro |  |  |  | 0.47 |  |
+| direccion (tasa = R) | 249 |  | 0.98 |  |  |
 | vigencia (tasa = R) | 259 |  | 0.93 |  |  |
