@@ -216,18 +216,34 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - Con hijo_de invertido: «su papá, Ricardo Romero» dicho de Camilo Romero produce Camilo familiar_de:hijo_de Ricardo, nunca al revés.
 
 ### apoya_a
-**Definición:** Una persona u organización respalda explícitamente a otra persona, organización, candidatura o norma: apoyo, alianza, adhesión, coalición, autoría o respaldo de un proyecto de ley. La cabeza es quien apoya; la cola es lo apoyado. La autoría de una norma se anota como apoya_a (quien radica una ley la apoya) mientras no exista una relación propia para autoría.
+**Definición:** Una persona u organización respalda explícitamente a otra persona, organización, candidatura o norma: apoyo, alianza, adhesión, coalición o respaldo declarado a un proyecto de ley, sin que el texto afirme un acto legislativo concreto sobre la norma. La cabeza es quien apoya; la cola es lo apoyado. Si el texto afirma un acto (radicarla, redactarla, ser su ponente, sacarla adelante, sancionarla, aprobarla), gana la relación más específica: impulsa_norma, no apoya_a.
 **Ejemplos:**
 - «El Partido Liberal respaldó la candidatura de Petro» → Partido Liberal apoya_a Petro.
 - «Aliado del gobierno» → (persona) apoya_a (gobierno nombrado).
 - «Cambio Radical se sumó a la coalición de Duque» → Cambio Radical apoya_a Duque.
-- «El senador radicó el proyecto de reforma tributaria» → senador apoya_a «reforma tributaria».
+- «El partido apoya la reforma tributaria» → (partido) apoya_a «reforma tributaria».
 **No es:**
 - Dos personas que aparecen en el mismo evento: no se marca.
 - «Petro nombró a X»: nombro_a.
+- «El senador radicó el proyecto de reforma tributaria»: hay un acto, no solo una postura; es impulsa_norma.
 **Confusiones:**
 - Con miembro_de: militar en un partido no es apoyar a su candidato salvo que el texto lo diga.
 - Con se_opone_a: el signo contrario.
+- Con impulsa_norma: una postura declarada de respaldo, sin acto, es apoya_a; radicar, redactar, ser ponente, sacar adelante, sancionar o aprobar una norma es un acto, y es impulsa_norma.
+
+### impulsa_norma
+**Definición:** Una persona u organización ejecuta un acto legislativo sobre una norma: la radica, la redacta, es su ponente, la saca adelante, la sanciona o la aprueba. La cabeza es quien ejecuta el acto; la cola es la norma. Gana sobre apoya_a cuando el texto afirma un acto y no solo una postura declarada.
+**Ejemplos:**
+- «Santos logró sacar adelante proyectos trascendentales como la ley de transferencias, la ley de pensiones y una reforma tributaria» → Santos impulsa_norma «ley de transferencias», Santos impulsa_norma «ley de pensiones», Santos impulsa_norma «reforma tributaria».
+- «El senador radicó el proyecto de reforma tributaria» → senador impulsa_norma «reforma tributaria».
+- «Fue la ponente de la ley de garantías» → (persona) impulsa_norma «ley de garantías».
+- «El presidente sancionó la reforma a la salud» → presidente impulsa_norma «reforma a la salud».
+**No es:**
+- «El partido apoya la reforma tributaria» sin acto concreto: apoya_a.
+- «La bancada hundió el proyecto» o «archivó la reforma»: es un acto, pero de signo contrario; se_opone_a, no impulsa_norma.
+**Confusiones:**
+- Con apoya_a: una postura declarada de respaldo, sin acto, es apoya_a; el acto (radicar, redactar, ser ponente, sacar adelante, sancionar, aprobar) es impulsa_norma.
+- Con se_opone_a: hundir o archivar una norma también es un acto, pero de signo contrario; no se mezclan los dos signos en una sola etiqueta, así que sigue siendo se_opone_a.
 
 ### se_opone_a
 **Definición:** Una persona u organización se opone o critica explícitamente a otra persona, organización o norma: oposición política, crítica, voto en contra o hundimiento de un proyecto de ley. La cabeza es quien se opone; la cola es lo criticado o combatido.
@@ -238,10 +254,11 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 - «La bancada del Centro Democrático votó en contra de la reforma» → Centro Democrático se_opone_a «reforma».
 **No es:**
 - Dos candidatos al mismo cargo sin que el texto afirme rivalidad: no se marca.
-- «El proyecto fue radicado por Pérez»: eso es apoyo (apoya_a), no oposición.
+- «El proyecto fue radicado por Pérez»: eso es un acto a favor, impulsa_norma, no oposición.
 **Confusiones:**
 - Con investigado_por: denunciar penalmente ante una autoridad es se_opone_a solo si el texto lo presenta como oposición; la investigación la marca la autoridad.
-- Con apoya_a: criticar, votar en contra o hundir un proyecto es se_opone_a; radicarlo, impulsarlo o votar a favor es apoya_a.
+- Con impulsa_norma: hundir o archivar un proyecto es se_opone_a; radicarlo, redactarlo, ser su ponente, sacarlo adelante, sancionarlo o aprobarlo es impulsa_norma, el acto de signo contrario.
+- Con apoya_a: criticar es se_opone_a; una postura declarada de respaldo, sin acto, es apoya_a.
 
 ### investigado_por
 **Definición:** Una persona u organización está siendo investigada, imputada, acusada o fue condenada por una autoridad. La cabeza es el investigado; la cola es la autoridad. El delito no es una entidad y no se marca.

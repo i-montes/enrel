@@ -32,6 +32,7 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 | financia_a | organizacion, persona → organizacion, persona | no | — | B | Payment | P859 |
 | familiar_de | persona → persona | sí | conyuge, hijo_de, hermano, otro | C | Family | P26, P40, P22, P25, P3373, P1038 |
 | apoya_a | organizacion, persona → cargo, norma, organizacion, persona | no | — | C | — | — |
+| impulsa_norma | organizacion, persona → norma | no | — | C | — | — |
 | se_opone_a | organizacion, persona → norma, organizacion, persona | no | — | C | — | — |
 | investigado_por | organizacion, persona → organizacion | no | investigado, acusado, condenado | C | CourtCaseParty | P1399 |
 | ubicado_en | lugar, organizacion, persona → lugar | no | — | C | — | P159, P551, P131 |
@@ -68,6 +69,7 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | fundó | viejo y nuevo | vinculo_sin_tipo | fundo | vinculo_sin_tipo | fundo |
 | hermano de | viejo y nuevo | familiar_de:hermano | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | hijo de | viejo y nuevo | familiar_de:hijo_de | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
+| impulsa | nuevo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | investigado por | viejo y nuevo | vinculo_sin_tipo | investigado_por:investigado | vinculo_sin_tipo | investigado_por:investigado |
 | miembro de | viejo y nuevo | vinculo_sin_tipo | miembro_de | vinculo_sin_tipo | vinculo_sin_tipo |
 | nombró a | viejo y nuevo | nombro_a | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |

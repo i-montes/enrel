@@ -6,12 +6,12 @@ def test_tipos_y_constantes():
     assert (t.P, t.O, t.L, t.C, t.N, t.B, t.M) == t.TIPOS
 
 
-def test_hay_17_relaciones_y_24_clases_finas():
-    assert len(t.RELACIONES) == 17
+def test_hay_18_relaciones_y_25_clases_finas():
+    assert len(t.RELACIONES) == 18
     assert t.SIN_TIPO not in t.RELACIONES
-    assert len(t.CLASES_FINAS) == 24
+    assert len(t.CLASES_FINAS) == 25
     assert t.CLASES_FINAS[-1] == t.SIN_TIPO
-    assert t.INDICE_CLASE[t.SIN_TIPO] == 23
+    assert t.INDICE_CLASE[t.SIN_TIPO] == 24
 
 
 def test_clase_fina_y_desglosar():
@@ -44,6 +44,7 @@ def test_es_suceso():
     assert t.es_suceso("fundo")
     assert t.es_suceso("contrato_a")
     assert t.es_suceso("financia_a")
+    assert t.es_suceso("impulsa_norma")
     assert not t.es_suceso("ocupa_cargo")
     assert not t.es_suceso("dirige")
     assert not t.es_suceso(t.SIN_TIPO)
@@ -61,6 +62,12 @@ def test_admite():
     assert t.admite("se_opone_a", "organizacion", "norma")
     assert not t.admite("investigado_por", "persona", "norma")
     assert t.admite(t.SIN_TIPO, "monto", "obra")
+    # impulsa_norma: acto legislativo (radicar, redactar, ser ponente, sacar adelante,
+    # sancionar, aprobar) de persona u organización sobre una norma; direccional, no al revés.
+    assert t.admite("impulsa_norma", "persona", "norma")
+    assert t.admite("impulsa_norma", "organizacion", "norma")
+    assert not t.admite("impulsa_norma", "persona", "cargo")
+    assert not t.admite("impulsa_norma", "norma", "persona")
 
 
 def test_relaciones_admitidas_persona_persona():

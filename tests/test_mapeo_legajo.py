@@ -42,9 +42,15 @@ def test_mapear_tipo():
         ("socio de", "persona", "organizacion", "vigente", Mapeo("propietario_de", None, False, "vigente")),
         ("socio de", "persona", "persona", "vigente", Mapeo("socio_de", None, False, "vigente")),
         ("aliado de", "organizacion", "organizacion", "vigente", Mapeo("apoya_a", None, False, "vigente")),
-        # apoya_a y se_opone_a admiten norma en la cola (radicar/apoyar o criticar/hundir una ley).
+        # apoya_a y se_opone_a admiten norma en la cola (postura de apoyo o crítica/hundimiento
+        # de una ley, sin acto); impulsa_norma es el acto legislativo propio (radicar, redactar,
+        # ser ponente, sacar adelante, sancionar, aprobar).
         ("criticó a", "persona", "norma", "vigente", Mapeo("se_opone_a", None, False, "vigente")),
         ("apoyó a", "persona", "norma", "vigente", Mapeo("apoya_a", None, False, "vigente")),
+        ("impulsa", "persona", "norma", "vigente", Mapeo("impulsa_norma", None, False, "vigente")),
+        ("impulsa", "organizacion", "norma", "pasada", Mapeo("impulsa_norma", None, False, "pasada")),
+        # impulsa_norma no admite persona → cargo: cae en la reserva sin tipo.
+        ("impulsa", "persona", "cargo", "vigente", Mapeo(SIN_TIPO, None, False)),
         ("acusado de", "persona", "norma", "vigente", Mapeo(SIN_TIPO, None, False)),
         (
             "condenado por",

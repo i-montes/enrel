@@ -1,4 +1,4 @@
-"""El esquema de enrel: siete tipos de entidad, diecisiete relaciones y una de reserva.
+"""El esquema de enrel: siete tipos de entidad, dieciocho relaciones y una de reserva.
 
 Fuente: docs/superpowers/specs/2026-09-16-enrel-diseno.md §3. Las definiciones en prosa
 viven en docs/guia-anotacion.md; aquí solo la estructura que el código necesita.
@@ -39,12 +39,13 @@ _LISTA = [
     _r("financia_a", [P, O], [P, O], familia="B"),
     _r("familiar_de", [P], [P], simetrica=True, atributos=("conyuge", "hijo_de", "hermano", "otro"), familia="C"),
     _r("apoya_a", [P, O], [P, O, C, N], familia="C"),
+    _r("impulsa_norma", [P, O], [N], familia="C"),
     _r("se_opone_a", [P, O], [P, O, N], familia="C"),
     _r("investigado_por", [P, O], [O], atributos=("investigado", "acusado", "condenado"), familia="C"),
     _r("ubicado_en", [P, O, L], [L], familia="C"),
 ]
 RELACIONES: dict[str, DefRelacion] = {d.nombre: d for d in _LISTA}
-assert len(RELACIONES) == 17
+assert len(RELACIONES) == 18
 
 SIN_TIPO = "vinculo_sin_tipo"
 RELACIONES_Y_SIN_TIPO: tuple[str, ...] = tuple(RELACIONES) + (SIN_TIPO,)
@@ -62,7 +63,7 @@ VIGENCIA_POR_DEFECTO = "vigente"
 # Relaciones que describen un suceso puntual, no un estado que se sostiene en el tiempo: la
 # vigencia rara vez aplica («nombró a» no está ni «vigente» ni «pasado» ejerciéndose, ocurrió
 # una vez). Es informativa para la guía y el prompt del maestro; no restringe el esquema.
-_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a"})
+_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a", "impulsa_norma"})
 
 
 def es_suceso(relacion: str) -> bool:
@@ -86,7 +87,7 @@ def desglosar(clase: str) -> tuple[str, str | None]:
 CLASES_FINAS: tuple[str, ...] = tuple(clase_fina(d.nombre, a) for d in _LISTA for a in (d.atributos or (None,))) + (
     SIN_TIPO,
 )
-assert len(CLASES_FINAS) == 24
+assert len(CLASES_FINAS) == 25
 INDICE_CLASE: dict[str, int] = {c: i for i, c in enumerate(CLASES_FINAS)}
 
 

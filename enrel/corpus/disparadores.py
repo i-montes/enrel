@@ -1,4 +1,4 @@
-"""Léxico de disparadores léxicos por relación: una expresión regular por cada una de las 17 relaciones."""
+"""Léxico de disparadores léxicos por relación: una expresión regular por cada una de las 18 relaciones."""
 
 import re
 
@@ -35,6 +35,8 @@ DISPARADORES = {
         r"nuera|yerno|niet[oa]|abuel[oa])\b",
         "apoya_a": r"\b(respald[óo]|respalda|apoy[óo] a|apoya a|apoyo a la candidatura|aliad[oa]|se sum[óo] a|"
         r"adhiri[óo]|adhesi[óo]n|coalici[óo]n con)\b",
+        "impulsa_norma": r"\b(radic[óo]|redact[óo]|ponente de|sac[óo] adelante|sacar adelante|sancion[óo]|"
+        r"aprob[óo]|aprobaci[óo]n de)\b",
         "se_opone_a": r"\b(se opone|se opuso|oposici[óo]n a|critic[óo]|rechaz[óo]|cuestion[óo]|denunci[óo] a|"
         r"opositor[a]?|enfrentad[oa] con|rival de)\b",
         "investigado_por": r"\b(investigad[oa]|investigaci[óo]n de la|imputad[oa]|imputaci[óo]n|acusad[oa]|"

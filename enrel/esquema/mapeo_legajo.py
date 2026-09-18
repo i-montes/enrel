@@ -1,4 +1,4 @@
-"""Traduce el vocabulario de legajo (los 35 predicados viejos y los 25 nuevos) al esquema de enrel."""
+"""Traduce el vocabulario de legajo (los 35 predicados viejos y los 26 nuevos) al esquema de enrel."""
 
 from dataclasses import dataclass
 
@@ -72,8 +72,10 @@ _REGLAS = {
     "financia a": ("financia_a", None, False),
     "donó a": ("financia_a", None, False),
     "contrató a": ("contrato_a", None, False),
-    # apoya_a y se_opone_a admiten norma en la cola (autoría/apoyo u oposición a una ley); la
-    # comprobación genérica de `admite` en `mapear_predicado` descarta lo que no encaje.
+    # apoya_a y se_opone_a admiten norma en la cola (postura de apoyo u oposición a una ley,
+    # sin acto); impulsa_norma (más abajo, entre los nuevos) es el acto legislativo propio
+    # (radicar, redactar, ser ponente, sacar adelante, sancionar, aprobar). La comprobación
+    # genérica de `admite` en `mapear_predicado` descarta lo que no encaje.
     "aliado de": ("apoya_a", None, False),
     "apoyó a": ("apoya_a", None, False),
     "opositor de": ("se_opone_a", None, False),
@@ -98,6 +100,7 @@ _REGLAS = {
     "aspira al cargo": ("ocupa_cargo", "aspirante", False),
     "propietario de": ("propietario_de", None, False),
     "apoya a": ("apoya_a", None, False),
+    "impulsa": ("impulsa_norma", None, False),
     "se opone a": ("se_opone_a", None, False),
     "acusado por": ("investigado_por", "acusado", False),
     "cónyuge de": ("familiar_de", "conyuge", False),
@@ -164,6 +167,7 @@ PREDICADOS_NUEVOS = frozenset(
         "contrató a",
         "financia a",
         "apoya a",
+        "impulsa",
         "se opone a",
         "investigado por",
         "acusado por",
