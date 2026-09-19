@@ -1,4 +1,4 @@
-"""El esquema de enrel: cinco tipos de entidad, dieciocho relaciones y una de reserva.
+"""El esquema de enrel: cinco tipos de entidad, diecinueve relaciones y una de reserva.
 
 Fuente: docs/superpowers/specs/2026-09-16-enrel-diseno.md §3. Las definiciones en prosa
 viven en docs/guia-anotacion.md; aquí solo la estructura que el código necesita.
@@ -38,6 +38,7 @@ _LISTA = [
     _r("trabaja_en", [P], [O], familia="A"),
     _r("dirige", [P], [O], familia="A"),
     _r("miembro_de", [P], [O], familia="A"),
+    _r("estudio_en", [P], [O], familia="A"),
     _r("fundo", [P, O], [O], familia="B"),
     _r("propietario_de", [P, O], [O], familia="B"),
     _r("socio_de", [P], [P], simetrica=True, familia="B"),
@@ -52,7 +53,7 @@ _LISTA = [
     _r("ubicado_en", [P, O, L], [L], familia="C"),
 ]
 RELACIONES: dict[str, DefRelacion] = {d.nombre: d for d in _LISTA}
-assert len(RELACIONES) == 18
+assert len(RELACIONES) == 19
 
 SIN_TIPO = "vinculo_sin_tipo"
 RELACIONES_Y_SIN_TIPO: tuple[str, ...] = tuple(RELACIONES) + (SIN_TIPO,)
@@ -70,7 +71,11 @@ VIGENCIA_POR_DEFECTO = "vigente"
 # Relaciones que describen un suceso puntual, no un estado que se sostiene en el tiempo: la
 # vigencia rara vez aplica («nombró a» no está ni «vigente» ni «pasado» ejerciéndose, ocurrió
 # una vez). Es informativa para la guía y el prompt del maestro; no restringe el esquema.
-_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a", "impulsa_norma"})
+# `estudio_en` entra aquí igual que `fundo`: el vínculo (haber estudiado, haberse graduado)
+# queda cierto para siempre una vez que el texto lo afirma, así que «pasada» no describe que
+# el hecho dejó de serlo (a diferencia de `trabaja_en` u `ocupa_cargo`, donde «pasada» sí
+# señala que la relación terminó de verdad: la persona ya no trabaja allí ni ejerce el cargo).
+_SUCESOS = frozenset({"nombro_a", "sucedio_a", "fundo", "contrato_a", "financia_a", "impulsa_norma", "estudio_en"})
 
 
 def es_suceso(relacion: str) -> bool:
@@ -94,7 +99,7 @@ def desglosar(clase: str) -> tuple[str, str | None]:
 CLASES_FINAS: tuple[str, ...] = tuple(clase_fina(d.nombre, a) for d in _LISTA for a in (d.atributos or (None,))) + (
     SIN_TIPO,
 )
-assert len(CLASES_FINAS) == 25
+assert len(CLASES_FINAS) == 26
 INDICE_CLASE: dict[str, int] = {c: i for i, c in enumerate(CLASES_FINAS)}
 
 

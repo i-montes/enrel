@@ -12,6 +12,7 @@ EQUIVALENCIAS = {
     "sucedio_a": ("Succession", "P1365"),
     "miembro_de": ("Membership", "P102, P463"),
     "trabaja_en": ("Employment", "P108"),
+    "estudio_en": ("—", "—"),
     "dirige": ("Directorship", "P1037, P169, P488"),
     "fundo": ("—", "P112"),
     "propietario_de": ("Ownership", "P127, P1830"),

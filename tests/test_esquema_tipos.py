@@ -11,12 +11,12 @@ def test_tipos_y_constantes():
     assert (t.P, t.O, t.L, t.C, t.N) == t.TIPOS
 
 
-def test_hay_18_relaciones_y_25_clases_finas():
-    assert len(t.RELACIONES) == 18
+def test_hay_19_relaciones_y_26_clases_finas():
+    assert len(t.RELACIONES) == 19
     assert t.SIN_TIPO not in t.RELACIONES
-    assert len(t.CLASES_FINAS) == 25
+    assert len(t.CLASES_FINAS) == 26
     assert t.CLASES_FINAS[-1] == t.SIN_TIPO
-    assert t.INDICE_CLASE[t.SIN_TIPO] == 24
+    assert t.INDICE_CLASE[t.SIN_TIPO] == 25
 
 
 def test_clase_fina_y_desglosar():
@@ -36,6 +36,7 @@ def test_atributos():
     assert t.RELACIONES["familiar_de"].atributos == ("conyuge", "hijo_de", "hermano", "otro")
     assert t.RELACIONES["investigado_por"].atributos == ("investigado", "acusado", "condenado")
     assert t.RELACIONES["trabaja_en"].atributos == ()
+    assert t.RELACIONES["estudio_en"].atributos == ()
 
 
 def test_vigencias_y_defecto():
@@ -50,8 +51,13 @@ def test_es_suceso():
     assert t.es_suceso("contrato_a")
     assert t.es_suceso("financia_a")
     assert t.es_suceso("impulsa_norma")
+    # Como fundo: haber estudiado en un sitio queda cierto para siempre una vez afirmado;
+    # graduarse no lo vuelve «pasada» (a diferencia de trabaja_en/ocupa_cargo, donde «pasada»
+    # sí señala que la relación terminó de verdad).
+    assert t.es_suceso("estudio_en")
     assert not t.es_suceso("ocupa_cargo")
     assert not t.es_suceso("dirige")
+    assert not t.es_suceso("trabaja_en")
     assert not t.es_suceso(t.SIN_TIPO)
 
 
@@ -73,6 +79,9 @@ def test_admite():
     assert t.admite("impulsa_norma", "organizacion", "norma")
     assert not t.admite("impulsa_norma", "persona", "cargo")
     assert not t.admite("impulsa_norma", "norma", "persona")
+    # estudio_en: persona → organizacion, direccional, no al revés.
+    assert t.admite("estudio_en", "persona", "organizacion")
+    assert not t.admite("estudio_en", "organizacion", "persona")
 
 
 def test_relaciones_admitidas_persona_persona():
@@ -100,4 +109,12 @@ def test_simetria():
 def test_familias_cubren_todo_sin_repetir():
     todas = [r for fam in t.FAMILIAS.values() for r in fam]
     assert sorted(todas) == sorted(t.RELACIONES)
-    assert t.FAMILIAS["A"] == ("ocupa_cargo", "nombro_a", "sucedio_a", "trabaja_en", "dirige", "miembro_de")
+    assert t.FAMILIAS["A"] == (
+        "ocupa_cargo",
+        "nombro_a",
+        "sucedio_a",
+        "trabaja_en",
+        "dirige",
+        "miembro_de",
+        "estudio_en",
+    )

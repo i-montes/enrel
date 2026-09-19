@@ -1,4 +1,4 @@
-"""Convierte el oro y la plata de legajo (por párrafo, 35 o 25 predicados) al formato interno de enrel."""
+"""Convierte el oro y la plata de legajo (por párrafo, 35 o 27 predicados) al formato interno de enrel."""
 
 import json
 import sqlite3

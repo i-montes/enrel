@@ -18,3 +18,10 @@ def test_relaciones_disparadas_impulsa_norma():
     d = relaciones_disparadas(t)
     assert "impulsa_norma" in d
     assert "apoya_a" not in d
+
+
+def test_relaciones_disparadas_estudio_en():
+    t = "Estudió Economía en la Universidad de los Andes y tiene un Ph. D. de New York University."
+    d = relaciones_disparadas(t)
+    assert "estudio_en" in d
+    assert "trabaja_en" not in d
