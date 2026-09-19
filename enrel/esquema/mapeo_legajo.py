@@ -1,4 +1,4 @@
-"""Traduce el vocabulario de legajo (los 35 predicados viejos y los 26 nuevos) al esquema de enrel."""
+"""Traduce el vocabulario de legajo (los 35 predicados viejos y los 27 nuevos) al esquema de enrel."""
 
 from dataclasses import dataclass
 
@@ -105,6 +105,7 @@ _REGLAS = {
     "acusado por": ("investigado_por", "acusado", False),
     "cónyuge de": ("familiar_de", "conyuge", False),
     "vínculo sin tipo": (SIN_TIPO, None, False),
+    "estudió en": ("estudio_en", None, False),
 }
 
 PREDICADOS_VIEJOS = frozenset(
@@ -174,6 +175,7 @@ PREDICADOS_NUEVOS = frozenset(
         "condenado por",
         "ubicado en",
         "vínculo sin tipo",
+        "estudió en",
     ]
 )
 assert PREDICADOS_VIEJOS | PREDICADOS_NUEVOS == set(_REGLAS)

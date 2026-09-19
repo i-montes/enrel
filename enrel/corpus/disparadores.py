@@ -1,4 +1,4 @@
-"""Léxico de disparadores léxicos por relación: una expresión regular por cada una de las 18 relaciones."""
+"""Léxico de disparadores léxicos por relación: una expresión regular por cada una de las 19 relaciones."""
 
 import re
 
@@ -19,6 +19,9 @@ DISPARADORES = {
         r"encabeza|lidera)\b",
         "miembro_de": r"\b(militante de|miembro de|integrante de|hace parte de|pertenece a|afiliad[oa] a|"
         r"bancada de|junta directiva)\b",
+        "estudio_en": r"\b(estudi[óo]|egresad[oa] de|graduad[oa] de|se gradu[óo]|curs[óo]|doctorado en|"
+        r"maestr[ií]a en|m[aá]gister en|ph\.?\s?d\.?|mba|licenciad[oa] (en|de)|abogad[oa] de la|"
+        r"economista de la|ingenier[oa] .{0,20}de la)\b",
         "fundo": r"\b(fund[óo]|fundador[a]? de|cofundador[a]?|cre[óo] la (empresa|fundaci[óo]n|organizaci[óo]n)|"
         r"creador[a]? de)\b",
         "propietario_de": r"\b(dueñ[oa] de|propietari[oa] de|accionista|acciones de|controla la empresa|"

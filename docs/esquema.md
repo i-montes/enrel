@@ -22,6 +22,7 @@ Generado por `scripts/generar_esquema_md.py`. No editar a mano.
 | trabaja_en | persona → organizacion | no | — | A | Employment | P108 |
 | dirige | persona → organizacion | no | — | A | Directorship | P1037, P169, P488 |
 | miembro_de | persona → organizacion | no | — | A | Membership | P102, P463 |
+| estudio_en | persona → organizacion | no | — | A | — | — |
 | fundo | organizacion, persona → organizacion | no | — | B | — | P112 |
 | propietario_de | organizacion, persona → organizacion | no | — | B | Ownership | P127, P1830 |
 | socio_de | persona → persona | sí | — | B | Associate | P1327 |
@@ -62,6 +63,7 @@ Para cada predicado, el destino con los tipos de extremo más habituales; los de
 | dirige | viejo y nuevo | vinculo_sin_tipo | dirige | vinculo_sin_tipo | vinculo_sin_tipo |
 | donó a | viejo | financia_a | financia_a | vinculo_sin_tipo | financia_a |
 | dueño de | viejo | vinculo_sin_tipo | propietario_de | vinculo_sin_tipo | propietario_de |
+| estudió en | nuevo | vinculo_sin_tipo | estudio_en | vinculo_sin_tipo | vinculo_sin_tipo |
 | familiar de | viejo y nuevo | familiar_de:otro | vinculo_sin_tipo | vinculo_sin_tipo | vinculo_sin_tipo |
 | financia a | viejo y nuevo | financia_a | financia_a | vinculo_sin_tipo | financia_a |
 | fundó | viejo y nuevo | vinculo_sin_tipo | fundo | vinculo_sin_tipo | fundo |

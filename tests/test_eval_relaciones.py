@@ -117,7 +117,7 @@ def test_macro_excluye_sin_tipo_pero_micro_lo_incluye():
     p = pred([Relacion("p1", "p2", "nombro_a"), Relacion("p1", "p3", "vinculo_sin_tipo")])
     r = evaluar_relaciones([ORO], [p], "gruesa")
     assert "vinculo_sin_tipo" in r and r["vinculo_sin_tipo"].fp == 1
-    # `vinculo_sin_tipo` es la reserva (clase 18), no «sin relación»: micro la cuenta ahora,
+    # `vinculo_sin_tipo` es la reserva (clase 19), no «sin relación»: micro la cuenta ahora,
     # así que su falso positivo entra en `__micro__` pero no en `__micro_sin_reserva__`.
     assert r["__micro__"].fp == 1
     assert r["__micro_sin_reserva__"].fp == 0

@@ -1,7 +1,7 @@
 """Evaluación de relaciones sobre grupos emparejados: RE, RE+, nivel fino, micro, macro, dirección e Ign.
 
-Asimetría deliberada entre micro y macro sobre `vinculo_sin_tipo` (clase 19 del esquema, la
-reserva para vínculos reales que no encajan en ninguna de las 18 relaciones — no es «sin
+Asimetría deliberada entre micro y macro sobre `vinculo_sin_tipo` (clase 20 del esquema, la
+reserva para vínculos reales que no encajan en ninguna de las 19 relaciones — no es «sin
 relación», que la representa el umbral del modelo, no esta clase): `__micro__` la INCLUYE,
 para que un maestro que vuelque en la reserva lo que no sabe clasificar pague sus falsos
 positivos igual que cualquier otra clase. `__micro_sin_reserva__` la excluye, para poder

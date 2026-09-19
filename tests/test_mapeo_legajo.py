@@ -85,6 +85,10 @@ def test_mapear_tipo():
         ("trabaja en", "persona", "organizacion", "pasada", Mapeo("trabaja_en", None, False, "pasada")),
         ("miembro de", "persona", "organizacion", "pasada", Mapeo("miembro_de", None, False, "pasada")),
         ("dirige", "persona", "organizacion", "futura", Mapeo("dirige", None, False, "futura")),
+        # estudio_en: persona → organizacion, sin invertir; el sentido inverso no lo admite el
+        # esquema y cae en la reserva sin tipo.
+        ("estudió en", "persona", "organizacion", "vigente", Mapeo("estudio_en", None, False, "vigente")),
+        ("estudió en", "organizacion", "persona", "vigente", Mapeo(SIN_TIPO, None, False)),
     ],
 )
 def test_mapear_predicado(pred, ta, tb, cuando, esperado):

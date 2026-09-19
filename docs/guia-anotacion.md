@@ -94,6 +94,7 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 **Confusiones:**
 - Con miembro_de: empleo o asesoría es trabaja_en; pertenencia sin empleo (partido, junta, colectivo) es miembro_de.
 - Con dirige: si preside o gerencia, dirige.
+- Con estudio_en: dictar clase, ser decano o rector es trabaja_en; ser alumno o egresado es estudio_en. Las dos pueden ser ciertas a la vez sobre la misma organización (Echeverry estudió en los Andes y después fue decano allí).
 
 ### dirige
 **Definición:** Una persona encabeza, preside o gerencia una organización. La cabeza es la persona; la cola es la organización.
@@ -119,6 +120,22 @@ Esta guía es la fuente única de las definiciones. La leen las personas que cor
 **Confusiones:**
 - Con parte_de: parte_de es entre organizaciones; una persona nunca es parte_de.
 - Con trabaja_en: pertenencia sin empleo frente a empleo.
+- Con estudio_en: militar en un partido o sentarse en una junta es miembro_de; ser alumno o egresado de una institución educativa es estudio_en, no miembro_de.
+
+### estudio_en
+**Definición:** Una persona cursa o cursó estudios en una institución educativa: pregrado, posgrado, maestría, doctorado, o un título obtenido allí. La cabeza es la persona; la cola es la institución educativa.
+**Ejemplos:**
+- «Estudió Economía en la Universidad de los Andes» → (persona) estudio_en Universidad de los Andes.
+- «Tiene un Ph. D. en Economía de New York University» → (persona) estudio_en New York University.
+- «Ingeniero civil de la Universidad Nacional de Colombia, con maestría en economía de la Universidad de los Andes» → (persona) estudio_en Universidad Nacional de Colombia, (persona) estudio_en Universidad de los Andes.
+- «Es abogado de la Universidad del Rosario» → (persona) estudio_en Universidad del Rosario.
+**No es:**
+- «Es profesor de la Universidad Nacional»: dictar clase es trabaja_en, no estudio_en.
+- «Decano de la Facultad de Economía de los Andes»: dirigir o encabezar una facultad es dirige (y ocupa_cargo con el cargo), no estudio_en, aunque la misma persona también haya estudiado allí.
+- «Miembro de la junta directiva de la universidad»: pertenencia sin ser alumno es miembro_de.
+**Confusiones:**
+- Con trabaja_en: dictar clase, ser decano o rector es trabaja_en; ser alumno o egresado es estudio_en. Una misma persona puede tener las dos aristas hacia la misma universidad y ambas ser ciertas: Juan Carlos Echeverry estudió Economía en la Universidad de los Andes y después fue decano de su Facultad de Economía; eso es correcto, no un conflicto.
+- Con miembro_de: militar en un partido o sentarse en una junta es miembro_de; ser alumno o egresado no lo es.
 
 ### fundo
 **Definición:** Una persona u organización creó una organización. La cabeza es el fundador; la cola es lo fundado.
