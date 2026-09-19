@@ -92,8 +92,18 @@ class _Constructor:
         ] = []  # (mid_a, mid_b, pred, cuando, evidencia)
         self.designa: list[str] = []
         self.grupo_forzado: dict[str, str] = {}
-        self.offsets_parrafo = {pi: off for pi, (off, _) in enumerate(parrafos(articulo.texto_plano))}
-        self.textos_parrafo = {pi: t for pi, (_, t) in enumerate(parrafos(articulo.texto_plano))}
+        # El desplazamiento del cuerpo se incorpora aquí, una sola vez, para que `mencion` y
+        # `evidencia` no necesiten distinguir entre párrafo del cuerpo y título. El título
+        # (pi=-1) entra con offset 0 porque empieza en la posición 0 del documento completo
+        # (ver `Articulo.texto`); si el artículo no tiene título, la clave -1 no existe y una
+        # anotación con pi=-1 se descarta limpiamente donde ya se comprueba `pi not in
+        # c.textos_parrafo`, sin necesitar una rama nueva en ningún otro punto.
+        cuerpo = parrafos(articulo.texto_plano)
+        self.offsets_parrafo = {pi: articulo.desplazamiento_cuerpo + off for pi, (off, _) in enumerate(cuerpo)}
+        self.textos_parrafo = {pi: t for pi, (_, t) in enumerate(cuerpo)}
+        if articulo.titulo:
+            self.offsets_parrafo[-1] = 0
+            self.textos_parrafo[-1] = articulo.titulo
 
     def mencion(
         self,
@@ -107,7 +117,7 @@ class _Constructor:
         grupo: str | None = None,
     ) -> Mencion:
         tipo, designa_tipo = mapear_tipo(tipo_legajo)
-        base = self.art.desplazamiento_cuerpo + self.offsets_parrafo[pi]
+        base = self.offsets_parrafo[pi]
         m = Mencion(mid or f"m{len(self.menciones) + 1}", base + ini_local, base + fin_local, texto, tipo, "")
         self.menciones.append(m)
         if designa or designa_tipo:
@@ -117,7 +127,7 @@ class _Constructor:
         return m
 
     def evidencia(self, pi: int) -> tuple[int, int]:
-        base = self.art.desplazamiento_cuerpo + self.offsets_parrafo[pi]
+        base = self.offsets_parrafo[pi]
         return base, base + len(self.textos_parrafo[pi])
 
     def relacion(self, mid_a: str, mid_b: str, predicado: str, cuando: str | None, pi: int) -> None:
@@ -260,6 +270,14 @@ def documento_desde_sqlite(con: sqlite3.Connection, lote_id: int, articulo: Arti
         " WHERE lote_id = ? AND wp_id = ? ORDER BY pi, ini",
         (lote_id, articulo.wp_id),
     ).fetchall()
+    # `pi_de` solo debe tener los mid cuya mención se creó de verdad. Se construye dentro
+    # del mismo bucle (no como comprehension aparte sobre `filas`) porque, desde que el
+    # título es anotable (pi=-1), un mid descartado aquí (integridad fallida o tipo sin
+    # equivalente) puede tener pi=-1 sobre un artículo SIN título: si `pi_de` lo incluyera
+    # igual, una relación que lo referencie llamaría a `evidencia(-1)` y reventaría con
+    # KeyError en vez de filtrarse limpiamente como ya hace `construir` al no encontrar el
+    # mid en `por_mid`.
+    pi_de: dict[str, int] = {}
     for f in filas:
         pi = int(f["pi"])
         if pi not in c.textos_parrafo or c.textos_parrafo[pi][f["ini"] : f["fin"]] != f["texto"]:
@@ -282,7 +300,7 @@ def documento_desde_sqlite(con: sqlite3.Connection, lote_id: int, articulo: Arti
             # filtran solas en `construir`, al no encontrar su mid en `por_mid`.
             c.origen["no_localizadas"] += 1
             continue
-    pi_de = {f["mid"]: int(f["pi"]) for f in filas}
+        pi_de[f["mid"]] = pi
     for r in con.execute(
         "SELECT a_mid, b_mid, predicado, cuando FROM relaciones WHERE lote_id = ? AND wp_id = ?",
         (lote_id, articulo.wp_id),
