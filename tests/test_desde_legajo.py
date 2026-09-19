@@ -47,6 +47,9 @@ def test_oro_json_offsets_y_todas_las_apariciones():
         assert d.texto[m.ini : m.fin] == m.texto
     assert "presidente de Colombia" in [m.texto for m in d.menciones]
     assert len(d.origen["designa"]) == 1
+    # El título anotable (pi=-1) no debe cambiar cómo aterrizan los párrafos del cuerpo:
+    # siguen sumando `desplazamiento_cuerpo`, tal cual antes de que el título fuera anotable.
+    assert d.menciones[0].ini == ART.desplazamiento_cuerpo
 
 
 def test_oro_json_mapeo_e_inversion():
@@ -146,6 +149,71 @@ def test_sqlite_descarta_tipo_desconocido():
     assert len(d.menciones) == 1
     assert d.menciones[0].texto == "Ana Pérez"
     assert d.relaciones == []  # la relación que tocaba «monto» se filtra sola, sin su mid
+    assert d.origen["no_localizadas"] == 1
+
+
+def test_titulo_anotable_offset_correcto():
+    # La prueba que de verdad importa: pi=-1 son offsets relativos AL TÍTULO, y su
+    # desplazamiento en el documento completo es `ini` sin más (el título empieza en la
+    # posición 0 de `d.texto`), a diferencia de un párrafo del cuerpo que sí suma
+    # `desplazamiento_cuerpo`. ART.titulo == "Los Uribe": "Uribe" cae en (4, 9).
+    spec = {**SPEC, "parrafos": {**SPEC["parrafos"], "-1": {"E": [["Uribe", "persona"]], "R": []}}}
+    d = dl.documento_desde_oro_json(spec, ART)
+    assert validar_documento(d) == []
+    del_titulo = [m for m in d.menciones if m.ini < len(ART.titulo)]
+    assert len(del_titulo) == 1
+    m = del_titulo[0]
+    assert (m.ini, m.fin) == (4, 9)
+    assert d.texto[m.ini : m.fin] == m.texto == "Uribe"
+
+
+def test_titulo_sin_titulo_pi_menos_uno_se_descarta():
+    # `ART_TRES_PERSONAS` tiene titulo="": la clave -1 no existe en `textos_parrafo`, así que
+    # una anotación con pi=-1 se descarta por el mismo camino que cualquier pi inválido, sin
+    # lanzar excepción. La relación que toca ese mid descartado ejercita el arreglo de
+    # `pi_de`: si `pi_de` incluyera igual el mid descartado, `relacion` llamaría a
+    # `evidencia(-1)` y reventaría con KeyError en vez de filtrarse limpiamente en `construir`.
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    _esquema_legajo(con)
+    lote_id = 4
+    _insertar_anotacion(con, lote_id, ART_TRES_PERSONAS.wp_id, "m1", "Ana Pérez", 0)
+    con.execute(
+        "INSERT INTO anotaciones (lote_id, wp_id, mid, pi, ini, fin, texto, tipo, designa, grupo)"
+        " VALUES (?, ?, 'm2', -1, 0, 9, 'Un Título', 'persona', 0, NULL)",
+        (lote_id, ART_TRES_PERSONAS.wp_id),
+    )
+    con.execute(
+        "INSERT INTO relaciones (lote_id, wp_id, rid, a_mid, b_mid, predicado, cuando)"
+        " VALUES (?, ?, 'r1', 'm1', 'm2', 'vínculo sin tipo', 'vigente')",
+        (lote_id, ART_TRES_PERSONAS.wp_id),
+    )
+    con.commit()
+    d = dl.documento_desde_sqlite(con, lote_id, ART_TRES_PERSONAS)  # no debe lanzar KeyError
+    assert validar_documento(d) == []
+    assert len(d.menciones) == 1  # solo «Ana Pérez»; la de pi=-1 se descartó
+    assert d.menciones[0].texto == "Ana Pérez"
+    assert d.relaciones == []  # la relación que tocaba el mid descartado se filtra sola
+    assert d.origen["no_localizadas"] == 1
+
+
+def test_titulo_integridad_descarta_texto_no_coincide():
+    # La comprobación de integridad (`texto` de la fila debe coincidir con lo que hay
+    # realmente en esa posición) sigue funcionando igual para pi=-1: solo que ahora indexa
+    # `textos_parrafo[-1]` (el título) en vez de un párrafo del cuerpo.
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    _esquema_legajo(con)
+    lote_id = 5
+    con.execute(
+        "INSERT INTO anotaciones (lote_id, wp_id, mid, pi, ini, fin, texto, tipo, designa, grupo)"
+        " VALUES (?, ?, 'm1', -1, 0, 9, 'Otro texto', 'persona', 0, NULL)",
+        (lote_id, ART.wp_id),
+    )
+    con.commit()
+    d = dl.documento_desde_sqlite(con, lote_id, ART)
+    assert validar_documento(d) == []
+    assert d.menciones == []
     assert d.origen["no_localizadas"] == 1
 
 
